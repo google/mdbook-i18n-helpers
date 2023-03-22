@@ -1,5 +1,5 @@
 [package]
-name = "i18n-helpers"
+name = "mdbook-i18n-helpers"
 version = "0.1.0"
 edition = "2021"
 publish = false

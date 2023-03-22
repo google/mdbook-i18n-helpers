@@ -22,6 +22,7 @@
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
+use mdbook_i18n_helpers::extract_msgs;
 use polib::catalog::Catalog;
 use polib::message::Message;
 use std::{fs, io};
@@ -88,7 +89,7 @@ fn create_catalog(ctx: &RenderContext) -> anyhow::Result<Catalog> {
                 Some(path) => ctx.config.book.src.join(path),
                 None => continue,
             };
-            for msg in i18n_helpers::extract_msgs(&chapter.content) {
+            for msg in extract_msgs(&chapter.content) {
                 let source = format!("{}:{}", path.display(), msg.line_number());
                 add_message(&mut catalog, msg.text(&chapter.content), &source);
             }

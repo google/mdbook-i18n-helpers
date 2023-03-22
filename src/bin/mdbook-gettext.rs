@@ -24,10 +24,10 @@
 //! files. If the PO file is not found, you'll get the untranslated book.
 
 use anyhow::{anyhow, Context};
-use i18n_helpers::extract_msgs;
 use mdbook::book::Book;
 use mdbook::preprocess::{CmdPreprocessor, PreprocessorContext};
 use mdbook::BookItem;
+use mdbook_i18n_helpers::extract_msgs;
 use polib::catalog::Catalog;
 use polib::po_file;
 use semver::{Version, VersionReq};

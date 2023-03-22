@@ -616,19 +616,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "i18n-helpers"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "mdbook",
- "polib",
- "pulldown-cmark",
- "semver",
- "serde_json",
- "toml",
-]
-
-[[package]]
 name = "iana-time-zone"
 version = "0.1.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -857,6 +844,19 @@ dependencies = [
  "toml",
  "topological-sort",
  "warp",
+]
+
+[[package]]
+name = "mdbook-i18n-helpers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "mdbook",
+ "polib",
+ "pulldown-cmark",
+ "semver",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
