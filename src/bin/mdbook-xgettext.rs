@@ -18,8 +18,6 @@
 //! translatable strings from your book. The strings are saved in a
 //! GNU Gettext `messages.pot` file in your build directory (typically
 //! `po/messages.pot`).
-//!
-//! See `TRANSLATIONS.md` in the repository root for more information.
 
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
