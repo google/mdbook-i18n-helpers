@@ -31,7 +31,8 @@ impl Message {
         Self { line, span }
     }
 
-    /// Get the text of this message, as a slice of the document from which it was generated.
+    /// Get the text of this message, as a slice of the document from
+    /// which it was generated.
     pub fn text<'doc>(&self, document: &'doc str) -> &'doc str {
         &document[self.span.clone()]
     }
@@ -41,7 +42,8 @@ impl Message {
         self.line
     }
 
-    /// Get the span of the source document from which this message is drawn.
+    /// Get the span of the source document from which this message is
+    /// drawn.
     pub fn span(&self) -> Range<usize> {
         self.span.clone()
     }
@@ -58,12 +60,14 @@ impl Message {
     }
 }
 
-/// Accumulator for translatable messages based on input from the Markdown parser.
+/// Accumulator for translatable messages based on input from the
+/// Markdown parser.
 struct MsgAccumulator<'a> {
     /// The input document.
     document: &'a str,
 
-    /// Offsets of each newline in the input, used to calculate line numbers from byte offsets.
+    /// Offsets of each newline in the input, used to calculate line
+    /// numbers from byte offsets.
     offsets: Vec<usize>,
 
     /// The resulting messages, as ranges of the input document.
@@ -75,8 +79,8 @@ struct MsgAccumulator<'a> {
     /// If set, skip until the nesting depth returns to this level.
     skip_until_depth: Option<usize>,
 
-    /// True if the last message can still be appended to. If this is true then
-    /// msgs has at least one element.
+    /// Can the last message still be appended to? If this is `true`
+    /// then `self.msgs` has at least one element.
     message_open: bool,
 }
 
@@ -132,8 +136,8 @@ impl<'a> MsgAccumulator<'a> {
             _ => {}
         }
 
-        // Handle skip_until_depth, including skipping the End event that
-        // returned to the desired level.
+        // Handle skip_until_depth, including skipping the End event
+        // that returned to the desired level.
         if let Some(depth) = self.skip_until_depth {
             if self.depth <= depth {
                 self.skip_until_depth = None;
@@ -143,18 +147,20 @@ impl<'a> MsgAccumulator<'a> {
 
         match evt {
             // Consider "inline" tags to be just part of the text.
-            Event::Start(
-                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..),
-            ) => self.push_message(span),
-            Event::End(
-                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..),
-            ) => self.push_message(span),
+            Event::Start(Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..)) => {
+                self.push_message(span)
+            }
+            Event::End(Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..)) => {
+                self.push_message(span)
+            }
 
-            // We want to translate everything: text, code (from backticks, `..`), or HTML.
+            // We want to translate everything: text, code (from
+            // backticks, `..`), or HTML.
             Event::Text(_) | Event::Code(_) | Event::Html(_) => self.push_message(span),
 
-            // For many event types we just take the entire text from Start to End, which is
-            // already encompassed in the event span.
+            // For many event types we just take the entire text from
+            // Start to End, which is already encompassed in the event
+            // span.
             Event::Start(
                 Tag::CodeBlock(_)
                 | Tag::Heading(..)
@@ -169,8 +175,8 @@ impl<'a> MsgAccumulator<'a> {
                 self.skip_until_depth = Some(self.depth - 1);
             }
 
-            // For any other Start or End events, finish the current message but do
-            // not begin a new one.
+            // For any other Start or End events, finish the current
+            // message but do not begin a new one.
             Event::Start(_) | Event::End(_) => self.finish_message(),
 
             _ => {}
@@ -190,9 +196,10 @@ impl<'a> MsgAccumulator<'a> {
     }
 }
 
-/// Extract translatable messages from the markdown text.
+/// Extract translatable messages from the Markdown text.
 ///
-/// Returns a vector of (line number, text), where line numbers begin at 1.
+/// Returns a vector of (line number, text), where line numbers begin
+/// at 1.
 pub fn extract_msgs(document: &str) -> Vec<Message> {
     MsgAccumulator::new(document).into_msgs()
 }
@@ -265,10 +272,10 @@ mod tests {
     fn extract_msgs_simple() {
         assert_extract_msgs!(
             "This is\n\
-                 the first\n\
-                 paragraph.🦀\n\
-                 \n\
-                 Second paragraph.",
+             the first\n\
+             paragraph.🦀\n\
+             \n\
+             Second paragraph.",
             vec![
                 (1, "This is\nthe first\nparagraph.🦀"),
                 (5, "Second paragraph.")
@@ -280,10 +287,10 @@ mod tests {
     fn extract_msgs_leading_newlines() {
         assert_extract_msgs!(
             "\n\
-                 \n\
-                 \n\
-                 This is the\n\
-                 first paragraph.",
+             \n\
+             \n\
+             This is the\n\
+             first paragraph.",
             vec![(4, "This is the\nfirst paragraph.")]
         );
     }
@@ -292,9 +299,9 @@ mod tests {
     fn extract_msgs_trailing_newlines() {
         assert_extract_msgs!(
             "This is\n\
-                 a paragraph.\n\
-                 \n\
-                 \n",
+             a paragraph.\n\
+             \n\
+             \n",
             vec![(1, "This is\na paragraph.")]
         );
     }
@@ -333,8 +340,9 @@ mod tests {
 [pt-BR]: https://google.github.io/comprehensive-rust/pt-BR/
 [ko]: https://google.github.io/comprehensive-rust/ko/
 "#,
-            // The parser does not include the referenced links in the events it produces. This is
-            // probably OK: links would not have been translated, anyway.
+            // The parser does not include the referenced links in the
+            // events it produces. This is probably OK: links would
+            // not have been translated, anyway.
             vec![(2, "* [Brazilian Portuguese][pt-BR] and\n* [Korean][ko]"),]
         );
     }
@@ -374,10 +382,14 @@ mod tests {
 
     #[test]
     fn extract_msgs_code_block() {
-        assert_extract_msgs!("Preamble\n```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
+        assert_extract_msgs!(
+            "Preamble\n```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
             vec![
                 (1, "Preamble"),
-                (2, "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```"),
+                (
+                    2,
+                    "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```"
+                ),
                 (9, "Postamble")
             ]
         );
@@ -385,8 +397,9 @@ mod tests {
 
     #[test]
     fn extract_msgs_details() {
-        // This isn't great, because the parser treats any data following a tag as also HTML,
-        // but works well enough when `<details>` has blank lines before and after.
+        // This isn't great, because the parser treats any data
+        // following a tag as also HTML, but works well enough when
+        // `<details>` has blank lines before and after.
         assert_extract_msgs!(
             "Preamble\n<details>\nSome Details\n</details>\n\nPostamble",
             vec![
@@ -473,8 +486,8 @@ Top level.
 
     #[test]
     fn extract_msgs_code_followed_by_details() {
-        // This is a regression test for an error that would incorrectly combine
-        // CodeBlock and HTML.
+        // This is a regression test for an error that would
+        // incorrectly combine CodeBlock and HTML.
         assert_extract_msgs!(
             r#"```bob
 BOB
