@@ -17,9 +17,9 @@ $ cargo install mdbook-i18n-helpers
 
 to install the two binaries in this repository:
 
-* `mdbook-xgettext`: This program extracts the source text. It is an [`mdbook`
-  renderer].
-* `mdbook-gettext`: This program translates the book into a target language. It
+- `mdbook-xgettext`: This program extracts the source text. It is an
+  [`mdbook` renderer].
+- `mdbook-gettext`: This program translates the book into a target language. It
   is an [`mdbook` preprocessor].
 
 [`mdbook` renderer]: https://rust-lang.github.io/mdBook/format/configuration/renderers.html
@@ -100,7 +100,6 @@ You can also simply copy `po/messages.pot` to `po/xx.po` if you don't have
 update the header (the first entry with `msgid ""`) manually to the correct
 language.
 
-
 ### Updating an Existing Translation
 
 As the source text changes, translations gradually become outdated. To update
@@ -177,8 +176,8 @@ Please see the [`publish.yml`] workflow in the Comprehensive Rust 🦀 repositor
 
 ## Contact
 
-For questions or comments, please contact [Martin
-Geisler](mailto:mgeisler@google.com) or start a
+For questions or comments, please contact
+[Martin Geisler](mailto:mgeisler@google.com) or start a
 [discussion](https://github.com/google/mdbook-i18n-helpers/discussions). We
 would love to hear from you.
 
