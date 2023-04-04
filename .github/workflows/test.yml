@@ -34,3 +34,13 @@ jobs:
 
       - name: Clippy
         run: cargo clippy -- -D clippy::dbg_macro
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check Formatting
+        uses: dprint/check@v2.2
