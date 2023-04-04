@@ -33,7 +33,6 @@ use polib::catalog::Catalog;
 use polib::po_file;
 use semver::{Version, VersionReq};
 use std::{io, process};
-use toml::Value;
 
 fn translate(text: &str, catalog: &Catalog) -> String {
     let mut consumed = 0; // bytes of text consumed so far
@@ -77,7 +76,7 @@ fn translate_book(ctx: &PreprocessorContext, mut book: Book) -> anyhow::Result<B
         .config
         .get_preprocessor("gettext")
         .ok_or_else(|| anyhow!("Could not read preprocessor.gettext configuration"))?;
-    let po_dir = cfg.get("po-dir").and_then(Value::as_str).unwrap_or("po");
+    let po_dir = cfg.get("po-dir").and_then(|v| v.as_str()).unwrap_or("po");
     let path = ctx.root.join(po_dir).join(format!("{language}.po"));
     // Nothing to do if PO file is missing.
     if !path.exists() {
