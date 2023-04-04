@@ -181,3 +181,7 @@ For questions or comments, please contact [Martin
 Geisler](mailto:mgeisler@google.com) or start a
 [discussion](https://github.com/google/mdbook-i18n-helpers/discussions). We
 would love to hear from you.
+
+---
+
+This is not an officially supported Google product.
