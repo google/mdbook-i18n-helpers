@@ -104,6 +104,12 @@ You can also simply copy `po/messages.pot` to `po/xx.po` if you don't have
 update the header (the first entry with `msgid ""`) manually to the correct
 language.
 
+> **Tip:** You can use the
+> [`cloud-translate`](https://github.com/mgeisler/cloud-translate) tool to
+> quickly machine-translate a new translation. Untranslated entries will be sent
+> through GCP Cloud Translate. Some of the translations will be wrong after
+> this, so you must inspect them by hand afterwards.
+
 ### Updating an Existing Translation
 
 As the source text changes, translations gradually become outdated. To update
@@ -124,9 +130,14 @@ remove the fuzzy marker.
 This will show you how to use the translations to generate localized HTML
 output.
 
-> **Note:** `mdbook-gettext` will ignore entries marked as "fuzzy" (visible as
-> "Needs work" in Poedit). If your text isn't translated, double-check that you
-> have removed all "fuzzy" flags from your `xx.po` file.
+> **Note:** `mdbook-gettext` will use the original untranslated text for all
+> entries marked as "fuzzy" (visible as "Needs work" in Poedit). This is
+> especially important when using
+> [`cloud-translate`](https://github.com/mgeisler/cloud-translate) for initial
+> translation as all entries will be marked as "fuzzy".
+>
+> If your text isn't translated, double-check that you have removed all "fuzzy"
+> flags from your `xx.po` file.
 
 ### Building a Translated Book
 
