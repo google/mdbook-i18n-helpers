@@ -87,9 +87,9 @@ struct MsgAccumulator<'a> {
 impl<'a> MsgAccumulator<'a> {
     fn new(document: &'a str) -> Self {
         Self {
-            document: document,
+            document,
             offsets: document
-                .match_indices("\n")
+                .match_indices('\n')
                 .map(|(offset, _)| offset)
                 .collect(),
             msgs: vec![],
