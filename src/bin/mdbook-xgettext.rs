@@ -58,7 +58,8 @@ fn create_catalog(ctx: &RenderContext) -> anyhow::Result<Catalog> {
     // correct line numbers for duplicate lines by tracking the index
     // of our last search.
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
-    let summary = std::fs::read_to_string(ctx.root.join(&summary_path))?;
+    let summary = std::fs::read_to_string(ctx.root.join(&summary_path))
+        .with_context(|| anyhow!("Failed to read {}", summary_path.display()))?;
     let mut last_idx = 0;
     for item in ctx.book.iter() {
         let line = match item {
@@ -116,4 +117,109 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("Writing messages to {}", output_path.display()))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mdbook::MDBook;
+
+    fn create_render_context(
+        files: &[(&str, &str)],
+    ) -> anyhow::Result<(RenderContext, tempfile::TempDir)> {
+        let tmpdir = tempfile::tempdir().context("Could not create temporary directory")?;
+        std::fs::create_dir(tmpdir.path().join("src"))
+            .context("Could not create src/ directory")?;
+
+        for (path, contents) in files {
+            std::fs::write(tmpdir.path().join(path), contents)
+                .with_context(|| format!("Could not write {path}"))?;
+        }
+
+        let mdbook = MDBook::load(tmpdir.path()).context("Could not load book")?;
+        let ctx = RenderContext::new(mdbook.root, mdbook.book, mdbook.config, "dest");
+        Ok((ctx, tmpdir))
+    }
+
+    #[test]
+    fn test_create_catalog_defaults() -> anyhow::Result<()> {
+        let (ctx, _tmp) =
+            create_render_context(&[("book.toml", "[book]"), ("src/SUMMARY.md", "")])?;
+
+        let catalog = create_catalog(&ctx).unwrap();
+        assert_eq!(catalog.metadata.project_id_version, "");
+        assert_eq!(catalog.metadata.language, "en");
+        assert_eq!(catalog.metadata.mime_version, "1.0");
+        assert_eq!(catalog.metadata.content_type, "text/plain; charset=UTF-8");
+        assert_eq!(catalog.metadata.content_transfer_encoding, "8bit");
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_metadata() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 title = \"My Translatable Book\"\n\
+                 language = \"fr\"",
+            ),
+            ("src/SUMMARY.md", ""),
+        ])?;
+
+        let catalog = create_catalog(&ctx).unwrap();
+        assert_eq!(catalog.metadata.project_id_version, "My Translatable Book");
+        assert_eq!(catalog.metadata.language, "fr");
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_summary_formatting() -> anyhow::Result<()> {
+        // It is an error to include formatting in the summary file:
+        // it is stripped by mdbook and we cannot find it later when
+        // trying to translate the book.
+        let (ctx, _tmp) = create_render_context(&[
+            ("book.toml", "[book]"),
+            ("src/SUMMARY.md", "- [foo *bar* baz]()"),
+        ])?;
+
+        assert!(create_catalog(&ctx).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            ("book.toml", "[book]"),
+            ("src/SUMMARY.md", "- [The Foo Chapter](foo.md)"),
+            (
+                "src/foo.md",
+                "# How to Foo\n\
+                 \n\
+                 The first paragraph about Foo.\n\
+                 Still the first paragraph.\n",
+            ),
+        ])?;
+
+        let catalog = create_catalog(&ctx)?;
+
+        for msg in catalog.messages() {
+            assert!(!msg.is_translated());
+        }
+
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| msg.msgid())
+                .collect::<Vec<&str>>(),
+            &[
+                "The Foo Chapter",
+                "# How to Foo",
+                "The first paragraph about Foo.\n\
+                 Still the first paragraph."
+            ]
+        );
+
+        Ok(())
+    }
 }
