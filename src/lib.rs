@@ -241,36 +241,29 @@ mod tests {
         );
     }
 
-    fn msg_to_tuple<'doc>(msg: &Message, document: &'doc str) -> (usize, &'doc str) {
-        (msg.line_number(), msg.text(document))
-    }
-
-    macro_rules! assert_extract_msgs {
-        ($document:expr, $exp:expr) => {{
-            let document = $document;
-            assert_eq!(
-                extract_msgs(document)
-                    .iter()
-                    .map(|m| msg_to_tuple(m, document))
-                    .collect::<Vec<_>>(),
-                $exp
-            )
-        }};
+    /// Extract messages in `document`, assert they match `expected`.
+    #[track_caller]
+    fn assert_extract_msgs(document: &str, expected: Vec<(usize, &str)>) {
+        let lineno_texts = extract_msgs(document)
+            .iter()
+            .map(|msg| (msg.line_number(), msg.text(document)))
+            .collect::<Vec<_>>();
+        assert_eq!(lineno_texts, expected);
     }
 
     #[test]
     fn extract_msgs_empty() {
-        assert_extract_msgs!("", vec![]);
+        assert_extract_msgs("", vec![]);
     }
 
     #[test]
     fn extract_msgs_single_line() {
-        assert_extract_msgs!("This is a paragraph.", vec![(1, "This is a paragraph.")]);
+        assert_extract_msgs("This is a paragraph.", vec![(1, "This is a paragraph.")]);
     }
 
     #[test]
     fn extract_msgs_simple() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "This is\n\
              the first\n\
              paragraph.🦀\n\
@@ -278,61 +271,61 @@ mod tests {
              Second paragraph.",
             vec![
                 (1, "This is\nthe first\nparagraph.🦀"),
-                (5, "Second paragraph.")
-            ]
+                (5, "Second paragraph."),
+            ],
         );
     }
 
     #[test]
     fn extract_msgs_leading_newlines() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "\n\
              \n\
              \n\
              This is the\n\
              first paragraph.",
-            vec![(4, "This is the\nfirst paragraph.")]
+            vec![(4, "This is the\nfirst paragraph.")],
         );
     }
 
     #[test]
     fn extract_msgs_trailing_newlines() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "This is\n\
              a paragraph.\n\
              \n\
              \n",
-            vec![(1, "This is\na paragraph.")]
+            vec![(1, "This is\na paragraph.")],
         );
     }
 
     #[test]
     fn extract_msgs_styled_text() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "**This** ~~message~~ _has_ `code` *style*\n",
-            vec![(1, "**This** ~~message~~ _has_ `code` *style*")]
+            vec![(1, "**This** ~~message~~ _has_ `code` *style*")],
         );
     }
 
     #[test]
     fn extract_msgs_inline_html() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "Hi <script>alert('there');</script>",
-            vec![(1, "Hi <script>alert('there');</script>")]
+            vec![(1, "Hi <script>alert('there');</script>")],
         );
     }
 
     #[test]
     fn extract_msgs_links() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "See [this page](https://example.com) for more info.",
-            vec![(1, "See [this page](https://example.com) for more info.")]
+            vec![(1, "See [this page](https://example.com) for more info.")],
         );
     }
 
     #[test]
     fn extract_msgs_links_footer() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             r#"
 * [Brazilian Portuguese][pt-BR] and
 * [Korean][ko]
@@ -343,13 +336,13 @@ mod tests {
             // The parser does not include the referenced links in the
             // events it produces. This is probably OK: links would
             // not have been translated, anyway.
-            vec![(2, "* [Brazilian Portuguese][pt-BR] and\n* [Korean][ko]"),]
+            vec![(2, "* [Brazilian Portuguese][pt-BR] and\n* [Korean][ko]")],
         );
     }
 
     #[test]
     fn extract_msgs_block_quote() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             r#"One of my favorite quotes is:
 
 > Don't believe everything you read on the Internet.
@@ -374,24 +367,24 @@ mod tests {
 | `rust_library`    | Produces a Rust library, and provides both `rlib` and `dylib` variants."#;
         let input = format!("Hey, a table\n\n{table}\n\nFooter.\n");
         // tables are included as part of the text.
-        assert_extract_msgs!(
+        assert_extract_msgs(
             &input,
-            vec![(1, "Hey, a table"), (3, table), (8, "Footer."),]
+            vec![(1, "Hey, a table"), (3, table), (8, "Footer.")],
         );
     }
 
     #[test]
     fn extract_msgs_code_block() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "Preamble\n```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
             vec![
                 (1, "Preamble"),
                 (
                     2,
-                    "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```"
+                    "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```",
                 ),
-                (9, "Postamble")
-            ]
+                (9, "Postamble"),
+            ],
         );
     }
 
@@ -400,41 +393,41 @@ mod tests {
         // This isn't great, because the parser treats any data
         // following a tag as also HTML, but works well enough when
         // `<details>` has blank lines before and after.
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "Preamble\n<details>\nSome Details\n</details>\n\nPostamble",
             vec![
                 (1, "Preamble"),
                 (2, "<details>\nSome Details\n</details>"),
-                (6, "Postamble")
-            ]
+                (6, "Postamble"),
+            ],
         );
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "Preamble\n\n<details>\n\nSome Details\n\n</details>\n\nPostamble",
             vec![
                 (1, "Preamble"),
                 (3, "<details>"),
                 (5, "Some Details"),
                 (7, "</details>"),
-                (9, "Postamble")
-            ]
+                (9, "Postamble"),
+            ],
         );
     }
 
     #[test]
     fn extract_msgs_list() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             "Some text\n * List item 1🦀\n * List item 2\n\nMore text",
             vec![
                 (1, "Some text"),
                 (2, " * List item 1🦀\n * List item 2"),
-                (5, "More text")
-            ]
+                (5, "More text"),
+            ],
         );
     }
 
     #[test]
     fn extract_msgs_multilevel_list() {
-        assert_extract_msgs!("Some text\n * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2\n\nMore text",
+        assert_extract_msgs("Some text\n * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2\n\nMore text",
             vec![
                 (1, "Some text"),
                 (2, " * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2"),
@@ -445,7 +438,7 @@ mod tests {
 
     #[test]
     fn extract_msgs_list_with_paras() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             r#"* Item 1.
 * Item 2,
   two lines.
@@ -466,7 +459,7 @@ Top level.
 
     #[test]
     fn extract_msgs_headings() {
-        assert_extract_msgs!(
+        assert_extract_msgs(
             r#"Some text
 # Headline News🦀
 
@@ -479,8 +472,8 @@ Top level.
                 (1, "Some text"),
                 (2, "# Headline News🦀"),
                 (4, "* A\n* List"),
-                (7, "## Subheading")
-            ]
+                (7, "## Subheading"),
+            ],
         );
     }
 
@@ -488,7 +481,7 @@ Top level.
     fn extract_msgs_code_followed_by_details() {
         // This is a regression test for an error that would
         // incorrectly combine CodeBlock and HTML.
-        assert_extract_msgs!(
+        assert_extract_msgs(
             r#"```bob
 BOB
 ```
@@ -504,7 +497,7 @@ BOB
                 (5, "<details>"),
                 (7, "* Blah blah"),
                 (9, "</details>"),
-            ]
+            ],
         );
     }
 }
