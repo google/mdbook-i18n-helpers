@@ -28,40 +28,47 @@ use anyhow::{anyhow, Context};
 use mdbook::book::Book;
 use mdbook::preprocess::{CmdPreprocessor, PreprocessorContext};
 use mdbook::BookItem;
-use mdbook_i18n_helpers::extract_msgs;
+use mdbook_i18n_helpers::{extract_events, group_events, reconstruct_markdown, Group};
 use polib::catalog::Catalog;
 use polib::po_file;
 use semver::{Version, VersionReq};
 use std::{io, process};
 
 fn translate(text: &str, catalog: &Catalog) -> String {
-    let mut consumed = 0; // bytes of text consumed so far
-    let mut output = String::with_capacity(text.len());
+    let mut translated_events = Vec::new();
+    let events = extract_events(text, None);
+    let mut state = None;
 
-    for msg in extract_msgs(text) {
-        let span = msg.span();
-
-        // Copy over any bytes of text that precede this message.
-        if consumed < span.start {
-            output.push_str(&text[consumed..span.start]);
+    for group in group_events(&events) {
+        match group {
+            Group::Translate(events) => {
+                // Reconstruct the message.
+                let (msgid, new_state) = reconstruct_markdown(events, state.clone());
+                let translated = catalog
+                    .find_message(None, &msgid, None)
+                    .filter(|msg| !msg.flags().is_fuzzy())
+                    .and_then(|msg| msg.msgstr().ok())
+                    .filter(|msgstr| !msgstr.is_empty());
+                // Generate new events or reuse old events.
+                match translated {
+                    Some(msgstr) => translated_events.extend(extract_events(msgstr, state)),
+                    None => translated_events.extend_from_slice(events),
+                }
+                // Advance the state.
+                state = Some(new_state);
+            }
+            Group::Skip(events) => {
+                // Copy the events unchanged to the output.
+                translated_events.extend_from_slice(events);
+                // Advance the state.
+                let (_, new_state) = reconstruct_markdown(events, state);
+                state = Some(new_state);
+            }
         }
-
-        // Insert the translated text
-        let msg_text = msg.text(text);
-        let translated = catalog
-            .find_message(None, msg_text, None)
-            .filter(|msg| !msg.flags().is_fuzzy())
-            .and_then(|msg| msg.msgstr().ok())
-            .filter(|msgstr| !msgstr.is_empty())
-            .unwrap_or(msg_text);
-        output.push_str(translated);
-        consumed = span.end;
     }
 
-    // Handle any text left over after the last message.
-    let suffix = &text[consumed..];
-    output.push_str(suffix);
-    output
+    let (translated, _) = reconstruct_markdown(&translated_events, None);
+    translated
 }
 
 fn translate_book(ctx: &PreprocessorContext, mut book: Book) -> anyhow::Result<Book> {
@@ -160,19 +167,22 @@ mod tests {
     #[test]
     fn test_translate_single_paragraph() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
-        assert_eq!(translate("foo bar\n", &catalog), "FOO BAR\n");
+        // The output is normalized so the newline disappears.
+        assert_eq!(translate("foo bar\n", &catalog), "FOO BAR");
     }
 
     #[test]
     fn test_translate_paragraph_with_leading_newlines() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
-        assert_eq!(translate("\n\n\nfoo bar\n", &catalog), "\n\n\nFOO BAR\n");
+        // The output is normalized so the newlines disappear.
+        assert_eq!(translate("\n\n\nfoo bar\n", &catalog), "FOO BAR");
     }
 
     #[test]
     fn test_translate_paragraph_with_trailing_newlines() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
-        assert_eq!(translate("foo bar\n\n\n", &catalog), "FOO BAR\n\n\n");
+        // The output is normalized so the newlines disappear.
+        assert_eq!(translate("foo bar\n\n\n", &catalog), "FOO BAR");
     }
 
     #[test]
@@ -191,7 +201,7 @@ mod tests {
              \n\
              FOO BAR\n\
              \n\
-             last paragraph\n"
+             last paragraph"
         );
     }
 
@@ -214,33 +224,52 @@ mod tests {
                  PARAGRAPH",
             ),
         ]);
-        // Paragraph separation is kept intact while translating.
+        // Paragraph separation is normalized when translating.
         assert_eq!(
             translate(
-                "\n\
-                 first\n\
+                "first\n\
                  paragraph\n\
-                 \n\
                  \n\
                  \n\
                  last\n\
-                 paragraph\n\
-                 \n\
-                 \n",
+                 paragraph\n",
                 &catalog
             ),
-            "\n\
-             FIRST\n\
+            "FIRST\n\
              TRANSLATED\n\
              PARAGRAPH\n\
-             \n\
-             \n\
              \n\
              LAST\n\
              TRANSLATED\n\
-             PARAGRAPH\n\
+             PARAGRAPH"
+        );
+    }
+
+    #[test]
+    fn test_translate_code_block() {
+        let catalog = create_catalog(&[(
+            "fn foo() {\n\n    let x = 10;\n\n}\n",
+            "fn FOO() {\n\n    let X = 10;\n\n}\n",
+        )]);
+        assert_eq!(
+            translate(
+                "Text before.\n\
+                 \n\
+                 \n\
+                 ```rust,editable\n\
+                 fn foo() {\n\n    let x = 10;\n\n}\n\
+                 ```\n\
+                 \n\
+                 Text after.\n",
+                &catalog
+            ),
+            "Text before.\n\
              \n\
-             \n"
+             ```rust,editable\n\
+             fn FOO() {\n\n    let X = 10;\n\n}\n\
+             ```\n\
+             \n\
+             Text after.",
         );
     }
 }
