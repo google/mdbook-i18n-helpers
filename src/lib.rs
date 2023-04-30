@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Helpers for translating `mdbook` projects.
+//!
+//! The functions here are used to implement a robust
+//! internationalization (i18n) workflow for `mdbook`. This allows you
+//! to translate your books into other languages while also making it
+//! easy to keep the translations up to date as you edit the original
+//! source text.
+//!
+//! See <https://github.com/google/mdbook-i18n-helpers> for details on
+//! how to use the supplied `mdbook` plugins.
+
 use mdbook::utils::new_cmark_parser;
 use pulldown_cmark::{Event, Tag};
 use std::ops::Range;
