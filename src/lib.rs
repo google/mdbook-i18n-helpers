@@ -47,7 +47,7 @@ use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 ///     vec![
 ///         (1, Event::Start(Tag::Paragraph)),
 ///         (1, Event::Text("Hello,".into())),
-///         (1, Event::SoftBreak),
+///         (1, Event::Text(" ".into())),
 ///         (2, Event::Text("world!".into())),
 ///         (1, Event::End(Tag::Paragraph)),
 ///     ]
@@ -75,6 +75,10 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
             .into_offset_iter()
             .map(|(event, range)| {
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
+                let event = match event {
+                    Event::SoftBreak => Event::Text(" ".into()),
+                    _ => event,
+                };
                 (lineno, event)
             })
             .collect(),
@@ -285,8 +289,8 @@ pub fn reconstruct_markdown(
 /// assert_eq!(
 ///     messages,
 ///     vec![
-///         (1, "Hello, this is a\nlist in a quote.".into()),
-///         (4, "This is the second\nparagraph.".into()),
+///         (1, "Hello, this is a list in a quote.".into()),
+///         (4, "This is the second paragraph.".into()),
 ///     ],
 /// );
 /// ```
@@ -349,7 +353,7 @@ mod tests {
              \n\
              Second paragraph.",
             vec![
-                (1, "This is\nthe first\nparagraph.🦀"),
+                (1, "This is the first paragraph.🦀"),
                 (5, "Second paragraph."),
             ],
         );
@@ -363,7 +367,7 @@ mod tests {
              \n\
              This is the\n\
              first paragraph.",
-            vec![(4, "This is the\nfirst paragraph.")],
+            vec![(4, "This is the first paragraph.")],
         );
     }
 
@@ -374,7 +378,7 @@ mod tests {
              a paragraph.\n\
              \n\
              \n",
-            vec![(1, "This is\na paragraph.")],
+            vec![(1, "This is a paragraph.")],
         );
     }
 
@@ -594,7 +598,7 @@ The document[^1] text.
 "#,
             vec![
                 (1, "Item 1."),
-                (2, "Item 2,\ntwo lines."),
+                (2, "Item 2, two lines."),
                 (5, "Sub 1."),
                 (6, "Sub 2."),
             ],
