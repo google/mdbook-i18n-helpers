@@ -207,6 +207,7 @@ pub fn extract_msgs(document: &str) -> Vec<Message> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn offset_to_line_empty() {

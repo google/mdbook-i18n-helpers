@@ -123,6 +123,7 @@ fn main() -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use mdbook::MDBook;
+    use pretty_assertions::assert_eq;
 
     fn create_render_context(
         files: &[(&str, &str)],

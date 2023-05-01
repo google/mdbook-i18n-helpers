@@ -138,6 +138,7 @@ mod tests {
     use super::*;
     use polib::message::Message;
     use polib::metadata::CatalogMetadata;
+    use pretty_assertions::assert_eq;
 
     fn create_catalog(translations: &[(&str, &str)]) -> Catalog {
         let mut catalog = Catalog::new(CatalogMetadata::new());
