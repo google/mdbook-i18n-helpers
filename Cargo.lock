@@ -924,6 +924,7 @@ dependencies = [
  "mdbook",
  "polib",
  "pulldown-cmark",
+ "pulldown-cmark-to-cmark",
  "semver",
  "serde_json",
  "tempfile",
@@ -1224,6 +1225,15 @@ dependencies = [
  "bitflags",
  "memchr",
  "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark-to-cmark"
+version = "10.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0194e6e1966c23cc5fd988714f85b18d548d773e81965413555d96569931833d"
+dependencies = [
+ "pulldown-cmark",
 ]
 
 [[package]]

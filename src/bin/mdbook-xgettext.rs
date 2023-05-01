@@ -22,7 +22,7 @@
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
-use mdbook_i18n_helpers::extract_msgs;
+use mdbook_i18n_helpers::extract_messages;
 use polib::catalog::Catalog;
 use polib::message::Message;
 use polib::metadata::CatalogMetadata;
@@ -88,9 +88,9 @@ fn create_catalog(ctx: &RenderContext) -> anyhow::Result<Catalog> {
                 Some(path) => ctx.config.book.src.join(path),
                 None => continue,
             };
-            for msg in extract_msgs(&chapter.content) {
-                let source = format!("{}:{}", path.display(), msg.line_number());
-                add_message(&mut catalog, msg.text(&chapter.content), &source);
+            for (lineno, msgid) in extract_messages(&chapter.content) {
+                let source = format!("{}:{}", path.display(), lineno);
+                add_message(&mut catalog, &msgid, &source);
             }
         }
     }
@@ -214,7 +214,7 @@ mod tests {
                 .collect::<Vec<&str>>(),
             &[
                 "The Foo Chapter",
-                "# How to Foo",
+                "How to Foo",
                 "The first paragraph about Foo.\n\
                  Still the first paragraph."
             ]

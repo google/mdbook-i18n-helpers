@@ -25,256 +25,323 @@
 
 use mdbook::utils::new_cmark_parser;
 use pulldown_cmark::{Event, Tag};
-use std::ops::Range;
+use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 
-/// A translatable message.
-#[derive(PartialEq, Debug)]
-pub struct Message {
-    /// Line number where this message begins.
-    line: usize,
-
-    /// Span of the input text containing this message.
-    span: Range<usize>,
-}
-
-impl Message {
-    fn new(line: usize, span: Range<usize>) -> Self {
-        Self { line, span }
-    }
-
-    /// Get the text of this message, as a slice of the document from
-    /// which it was generated.
-    pub fn text<'doc>(&self, document: &'doc str) -> &'doc str {
-        &document[self.span.clone()]
-    }
-
-    /// Get the line number at which this message begins.
-    pub fn line_number(&self) -> usize {
-        self.line
-    }
-
-    /// Get the span of the source document from which this message is
-    /// drawn.
-    pub fn span(&self) -> Range<usize> {
-        self.span.clone()
-    }
-
-    /// Extend this message to the given offset.
-    fn extend(&mut self, to_end: usize) {
-        self.span.end = to_end;
-    }
-
-    /// Trim trailing newlines from this message.
-    fn trim_right(&mut self, document: &str) {
-        let trimmed_len = document[self.span.clone()].trim_end_matches('\n').len();
-        self.span.end = self.span.start + trimmed_len;
-    }
-}
-
-/// Accumulator for translatable messages based on input from the
-/// Markdown parser.
-struct MsgAccumulator<'a> {
-    /// The input document.
-    document: &'a str,
-
-    /// Offsets of each newline in the input, used to calculate line
-    /// numbers from byte offsets.
-    offsets: Vec<usize>,
-
-    /// The resulting messages, as ranges of the input document.
-    msgs: Vec<Message>,
-
-    /// Current nesting depth of Start/End events.
-    depth: usize,
-
-    /// If set, skip until the nesting depth returns to this level.
-    skip_until_depth: Option<usize>,
-
-    /// Can the last message still be appended to? If this is `true`
-    /// then `self.msgs` has at least one element.
-    message_open: bool,
-}
-
-impl<'a> MsgAccumulator<'a> {
-    fn new(document: &'a str) -> Self {
-        Self {
-            document,
-            offsets: document
-                .match_indices('\n')
-                .map(|(offset, _)| offset)
-                .collect(),
-            msgs: vec![],
-            depth: 0,
-            skip_until_depth: None,
-            message_open: false,
-        }
-    }
-
-    /// Mark the current message as finished.
-    fn finish_message(&mut self) {
-        self.message_open = false;
-    }
-
-    /// Add a new text message, or extend an existing one.
-    fn push_message(&mut self, span: Range<usize>) {
-        // try to combine with an existing message.
-        if self.message_open {
-            if let Some(last) = self.msgs.last_mut() {
-                last.extend(span.end);
-                return;
-            }
-        }
-
-        self.msgs
-            .push(Message::new(self.line_number(span.start), span));
-        self.message_open = true;
-    }
-
-    /// Calculate the line number for the given offset.
-    fn line_number(&self, offset: usize) -> usize {
-        self.offsets.partition_point(|&o| o < offset) + 1
-    }
-
-    /// Push a new Markdown event into the accumulator.
-    fn push_event(&mut self, evt: Event<'a>, span: Range<usize>) {
-        #[cfg(test)]
-        println!("{evt:?} -- {:?}", &self.document[span.start..span.end]);
-
-        // Track the nesting depth.
-        match evt {
-            Event::Start(_) => self.depth += 1,
-            Event::End(_) => self.depth -= 1,
-            _ => {}
-        }
-
-        // Handle skip_until_depth, including skipping the End event
-        // that returned to the desired level.
-        if let Some(depth) = self.skip_until_depth {
-            if self.depth <= depth {
-                self.skip_until_depth = None;
-            }
-            return;
-        }
-
-        match evt {
-            // Consider "inline" tags to be just part of the text.
-            Event::Start(Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..)) => {
-                self.push_message(span)
-            }
-            Event::End(Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..)) => {
-                self.push_message(span)
-            }
-
-            // We want to translate everything: text, code (from
-            // backticks, `..`), or HTML.
-            Event::Text(_) | Event::Code(_) | Event::Html(_) => self.push_message(span),
-
-            // For many event types we just take the entire text from
-            // Start to End, which is already encompassed in the event
-            // span.
-            Event::Start(
-                Tag::CodeBlock(_)
-                | Tag::Heading(..)
-                | Tag::List(..)
-                | Tag::BlockQuote
-                | Tag::Table(..),
-            ) => {
-                self.finish_message();
-                self.push_message(span);
-                self.finish_message();
-                // Skip until we get to a nesting depth outside of this Start event.
-                self.skip_until_depth = Some(self.depth - 1);
-            }
-
-            // For any other Start or End events, finish the current
-            // message but do not begin a new one.
-            Event::Start(_) | Event::End(_) => self.finish_message(),
-
-            _ => {}
-        }
-    }
-
-    /// Get the resulting list of messages.
-    fn into_msgs(mut self) -> Vec<Message> {
-        let parser = new_cmark_parser(self.document, false);
-        for (evt, span) in parser.into_offset_iter() {
-            self.push_event(evt, span);
-        }
-        for msg in &mut self.msgs {
-            msg.trim_right(self.document);
-        }
-        self.msgs
-    }
-}
-
-/// Extract translatable messages from the Markdown text.
+/// Extract Markdown events from `text`.
 ///
-/// Returns a vector of (line number, text), where line numbers begin
-/// at 1.
-pub fn extract_msgs(document: &str) -> Vec<Message> {
-    MsgAccumulator::new(document).into_msgs()
+/// The `state` can be used to give the parsing context. In
+/// particular, if a code block has started, the text should be parsed
+/// without interpreting special Markdown characters.
+///
+/// The events are labeled with the line number where they start in
+/// the document.
+///
+/// # Examples
+///
+/// ```
+/// use mdbook_i18n_helpers::extract_events;
+/// use pulldown_cmark::{Event, Tag};
+///
+/// assert_eq!(
+///     extract_events("Hello,\nworld!", None),
+///     vec![
+///         (1, Event::Start(Tag::Paragraph)),
+///         (1, Event::Text("Hello,".into())),
+///         (1, Event::SoftBreak),
+///         (2, Event::Text("world!".into())),
+///         (1, Event::End(Tag::Paragraph)),
+///     ]
+/// );
+/// ```
+pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(usize, Event<'a>)> {
+    // Offsets of each newline in the input, used to calculate line
+    // numbers from byte offsets.
+    let offsets = text
+        .match_indices('\n')
+        .map(|(offset, _)| offset)
+        .collect::<Vec<_>>();
+
+    match state {
+        // If we're in a code block, we disable the normal parsing and
+        // return lines of text. This matches the behavior of the
+        // parser in this case.
+        Some(state) if state.is_in_code_block => text
+            .split_inclusive('\n')
+            .enumerate()
+            .map(|(idx, line)| (idx + 1, Event::Text(line.into())))
+            .collect(),
+        // Otherwise, we parse the text line normally.
+        _ => new_cmark_parser(text, false)
+            .into_offset_iter()
+            .map(|(event, range)| {
+                let lineno = offsets.partition_point(|&o| o < range.start) + 1;
+                (lineno, event)
+            })
+            .collect(),
+    }
+}
+
+/// Markdown events grouped by type.
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Group<'a> {
+    /// Markdown events which should be translated.
+    ///
+    /// This includes `[Text("foo")]` as well as sequences with text
+    /// such as `[Start(Emphasis), Text("foo") End(Emphasis)]`.
+    Translate(&'a [(usize, Event<'a>)]),
+
+    /// Markdown events which should be skipped when translating.
+    ///
+    /// This includes structural events such as `Start(Heading(H1,
+    /// None, vec![]))`.
+    Skip(&'a [(usize, Event<'a>)]),
+}
+
+/// Group Markdown events into translatable and skipped events.
+///
+/// This function will partition the input events into groups of
+/// events which should be translated or skipped. Concatenating the
+/// events in each group will give you back the original events.
+///
+/// # Examples
+///
+/// ```
+/// use mdbook_i18n_helpers::{extract_events, group_events, Group};
+/// use pulldown_cmark::{Event, Tag};
+///
+/// let events = extract_events("This is a _paragraph_ of text.", None);
+/// assert_eq!(
+///     events,
+///     vec![
+///         (1, Event::Start(Tag::Paragraph)),
+///         (1, Event::Text("This is a ".into())),
+///         (1, Event::Start(Tag::Emphasis)),
+///         (1, Event::Text("paragraph".into())),
+///         (1, Event::End(Tag::Emphasis)),
+///         (1, Event::Text(" of text.".into())),
+///         (1, Event::End(Tag::Paragraph)),
+///     ],
+/// );
+///
+/// let groups = group_events(&events);
+/// assert_eq!(
+///     groups,
+///     vec![
+///         Group::Skip(&[
+///             (1, Event::Start(Tag::Paragraph)),
+///         ]),
+///         Group::Translate(&[
+///             (1, Event::Text("This is a ".into())),
+///             (1, Event::Start(Tag::Emphasis)),
+///             (1, Event::Text("paragraph".into())),
+///             (1, Event::End(Tag::Emphasis)),
+///             (1, Event::Text(" of text.".into())),
+///         ]),
+///         Group::Skip(&[
+///             (1, Event::End(Tag::Paragraph)),
+///         ]),
+///     ]
+/// );
+/// ```
+pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
+    let mut groups = Vec::new();
+
+    enum State {
+        Translate(usize),
+        Skip(usize),
+    }
+    let mut state = State::Skip(0);
+
+    for (idx, (_, event)) in events.iter().enumerate() {
+        match event {
+            Event::Start(
+                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
+            )
+            | Event::End(
+                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
+            )
+            | Event::Text(_)
+            | Event::Code(_)
+            | Event::FootnoteReference(_)
+            | Event::SoftBreak
+            | Event::HardBreak => {
+                // If we're currently skipping, then a new
+                // translatable group starts here.
+                if let State::Skip(start) = state {
+                    groups.push(Group::Skip(&events[start..idx]));
+                    state = State::Translate(idx);
+                }
+            }
+            _ => {
+                // If we're currently translating, then a new
+                // skippable group starts here.
+                if let State::Translate(start) = state {
+                    groups.push(Group::Translate(&events[start..idx]));
+                    state = State::Skip(idx);
+                }
+            }
+        }
+    }
+
+    match state {
+        State::Translate(start) => groups.push(Group::Translate(&events[start..])),
+        State::Skip(start) => groups.push(Group::Skip(&events[start..])),
+    }
+
+    groups
+}
+
+/// Render a slice of Markdown events back to Markdown.
+///
+/// # Examples
+///
+/// ```
+/// use mdbook_i18n_helpers::{extract_events, reconstruct_markdown};
+/// use pulldown_cmark::{Event, Tag};
+///
+/// let group = extract_events("Hello *world!*", None);
+/// let (reconstructed, _) = reconstruct_markdown(&group, None);
+/// assert_eq!(reconstructed, "Hello _world!_");
+/// ```
+///
+/// Notice how this will normalize the Markdown to use `_` for
+/// emphasis and `**` for strong emphasis. The style is chosen to
+/// match the [Google developer documentation style
+/// guide](https://developers.google.com/style/text-formatting).
+pub fn reconstruct_markdown(
+    group: &[(usize, Event)],
+    state: Option<State<'static>>,
+) -> (String, State<'static>) {
+    let events = group.iter().map(|(_, event)| event);
+    let mut markdown = String::new();
+    let options = Options {
+        code_block_token_count: 3,
+        list_token: '-',
+        emphasis_token: '_',
+        strong_token: "**",
+        ..Options::default()
+    };
+    // Advance the true state, but throw away the rendered Markdown
+    // since it can contain unwanted padding.
+    let new_state = cmark_resume_with_options(
+        events.clone(),
+        String::new(),
+        state.clone(),
+        options.clone(),
+    )
+    .unwrap();
+
+    // Block quotes and lists add padding to the state. This is
+    // reflected in the rendered Markdown. We want to capture the
+    // Markdown without the padding to remove the effect of these
+    // structural elements.
+    let state_without_padding = state.map(|state| State {
+        padding: Vec::new(),
+        ..state
+    });
+    cmark_resume_with_options(events, &mut markdown, state_without_padding, options).unwrap();
+    (markdown, new_state)
+}
+
+/// Extract translatable strings from `document`.
+///
+/// # Examples
+///
+/// Structural markup like headings and lists are removed from the
+/// messages:
+///
+/// ```
+/// use mdbook_i18n_helpers::extract_messages;
+///
+/// assert_eq!(
+///     extract_messages("# A heading"),
+///     vec![(1, "A heading".into())],
+/// );
+/// assert_eq!(
+///     extract_messages(
+///         "1. First item\n\
+///          2. Second item\n"
+///     ),
+///     vec![
+///         (1, "First item".into()),
+///         (2, "Second item".into()),
+///     ],
+/// );
+/// ```
+///
+/// Indentation due to structural elements like block quotes and lists
+/// is ignored:
+///
+/// ```
+/// use mdbook_i18n_helpers::extract_messages;
+///
+/// let messages = extract_messages(
+///     "> *   Hello, this is a\n\
+///      >     list in a quote.\n\
+///      >\n\
+///      >     This is the second\n\
+///      >     paragraph.\n"
+/// );
+/// assert_eq!(
+///     messages,
+///     vec![
+///         (1, "Hello, this is a\nlist in a quote.".into()),
+///         (4, "This is the second\nparagraph.".into()),
+///     ],
+/// );
+/// ```
+pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
+    let events = extract_events(document, None);
+    let mut messages = Vec::new();
+    let mut state = None;
+    for group in group_events(&events) {
+        match group {
+            Group::Translate(events) => {
+                if let Some((lineno, _)) = events.first() {
+                    let (text, new_state) = reconstruct_markdown(events, state);
+                    messages.push((*lineno, text));
+                    state = Some(new_state);
+                }
+            }
+            Group::Skip(events) => {
+                let (_, new_state) = reconstruct_markdown(events, state);
+                state = Some(new_state);
+            }
+        }
+    }
+
+    messages
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn offset_to_line_empty() {
-        assert_eq!(MsgAccumulator::new("").line_number(0), 1);
-    }
-
-    #[test]
-    fn offset_to_line_multiline() {
-        let input = "abc\ndef\nghi";
-        let acc = MsgAccumulator::new(input);
-        let line_nums: Vec<_> = input
-            .chars()
-            .enumerate()
-            .map(|(idx, ch)| (acc.line_number(idx), ch))
-            .collect();
-
-        assert_eq!(
-            line_nums,
-            vec![
-                (1, 'a'),
-                (1, 'b'),
-                (1, 'c'),
-                (1, '\n'),
-                (2, 'd'),
-                (2, 'e'),
-                (2, 'f'),
-                (2, '\n'),
-                (3, 'g'),
-                (3, 'h'),
-                (3, 'i'),
-            ]
-        );
-    }
-
     /// Extract messages in `document`, assert they match `expected`.
     #[track_caller]
-    fn assert_extract_msgs(document: &str, expected: Vec<(usize, &str)>) {
-        let lineno_texts = extract_msgs(document)
-            .iter()
-            .map(|msg| (msg.line_number(), msg.text(document)))
-            .collect::<Vec<_>>();
-        assert_eq!(lineno_texts, expected);
+    fn assert_extract_messages(document: &str, expected: Vec<(usize, &str)>) {
+        assert_eq!(
+            extract_messages(document)
+                .iter()
+                .map(|(lineno, msg)| (*lineno, &msg[..]))
+                .collect::<Vec<_>>(),
+            expected,
+        )
     }
 
     #[test]
-    fn extract_msgs_empty() {
-        assert_extract_msgs("", vec![]);
+    fn extract_messages_empty() {
+        assert_extract_messages("", vec![]);
     }
 
     #[test]
-    fn extract_msgs_single_line() {
-        assert_extract_msgs("This is a paragraph.", vec![(1, "This is a paragraph.")]);
+    fn extract_messages_single_line() {
+        assert_extract_messages("This is a paragraph.", vec![(1, "This is a paragraph.")]);
     }
 
     #[test]
-    fn extract_msgs_simple() {
-        assert_extract_msgs(
+    fn extract_messages_simple() {
+        assert_extract_messages(
             "This is\n\
              the first\n\
              paragraph.🦀\n\
@@ -288,8 +355,8 @@ mod tests {
     }
 
     #[test]
-    fn extract_msgs_leading_newlines() {
-        assert_extract_msgs(
+    fn extract_messages_leading_newlines() {
+        assert_extract_messages(
             "\n\
              \n\
              \n\
@@ -300,8 +367,8 @@ mod tests {
     }
 
     #[test]
-    fn extract_msgs_trailing_newlines() {
-        assert_extract_msgs(
+    fn extract_messages_trailing_newlines() {
+        assert_extract_messages(
             "This is\n\
              a paragraph.\n\
              \n\
@@ -311,32 +378,38 @@ mod tests {
     }
 
     #[test]
-    fn extract_msgs_styled_text() {
-        assert_extract_msgs(
-            "**This** ~~message~~ _has_ `code` *style*\n",
-            vec![(1, "**This** ~~message~~ _has_ `code` *style*")],
+    fn extract_messages_styled_text() {
+        // The parser normalizes "*emphasis*" to "_emphasis_" and
+        // "__strong emphasis__" to "**strong emphasis**".
+        assert_extract_messages(
+            "**This** __~~message~~__ _has_ `code` *style*\n",
+            vec![(1, "**This** **~~message~~** _has_ `code` _style_")],
         );
     }
 
     #[test]
-    fn extract_msgs_inline_html() {
-        assert_extract_msgs(
+    fn extract_messages_inline_html() {
+        // HTML tags are skipped, but text inside is extracted:
+        assert_extract_messages(
             "Hi <script>alert('there');</script>",
-            vec![(1, "Hi <script>alert('there');</script>")],
+            vec![
+                (1, "Hi "), //
+                (1, "alert('there');"),
+            ],
         );
     }
 
     #[test]
-    fn extract_msgs_links() {
-        assert_extract_msgs(
+    fn extract_messages_links() {
+        assert_extract_messages(
             "See [this page](https://example.com) for more info.",
             vec![(1, "See [this page](https://example.com) for more info.")],
         );
     }
 
     #[test]
-    fn extract_msgs_links_footer() {
-        assert_extract_msgs(
+    fn extract_messages_reference_links() {
+        assert_extract_messages(
             r#"
 * [Brazilian Portuguese][pt-BR] and
 * [Korean][ko]
@@ -344,16 +417,32 @@ mod tests {
 [pt-BR]: https://google.github.io/comprehensive-rust/pt-BR/
 [ko]: https://google.github.io/comprehensive-rust/ko/
 "#,
-            // The parser does not include the referenced links in the
-            // events it produces. This is probably OK: links would
-            // not have been translated, anyway.
-            vec![(2, "* [Brazilian Portuguese][pt-BR] and\n* [Korean][ko]")],
+            // The parser expands reference links on the fly.
+            vec![
+                (2, "[Brazilian Portuguese](https://google.github.io/comprehensive-rust/pt-BR/) and"),
+                (3, "[Korean](https://google.github.io/comprehensive-rust/ko/)"),
+            ]
         );
     }
 
     #[test]
-    fn extract_msgs_block_quote() {
-        assert_extract_msgs(
+    fn extract_messages_footnotes() {
+        assert_extract_messages(
+            "
+The document[^1] text.
+
+[^1]: The footnote text.
+",
+            vec![
+                (2, "The document[^1] text."), //
+                (4, "The footnote text."),
+            ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_block_quote() {
+        assert_extract_messages(
             r#"One of my favorite quotes is:
 
 > Don't believe everything you read on the Internet.
@@ -364,113 +453,156 @@ mod tests {
 "#,
             vec![
                 (1, "One of my favorite quotes is:"),
-                (3, "> Don't believe everything you read on the Internet.\n>\n> I didn't say this second part, but I needed a paragraph for testing."),
-                (7, "--Abraham Lincoln"),
-            ]
+                (3, "Don't believe everything you read on the Internet."),
+                (
+                    5,
+                    "I didn't say this second part, but I needed a paragraph for testing.",
+                ),
+                (7, "\\--Abraham Lincoln"),
+            ],
         );
     }
 
     #[test]
-    fn extract_msgs_table() {
-        let table = r#"| Module Type       | Description
-|-------------------|------------------------------------------------------------------------
-| `rust_binary`     | Produces a Rust binary.
-| `rust_library`    | Produces a Rust library, and provides both `rlib` and `dylib` variants."#;
-        let input = format!("Hey, a table\n\n{table}\n\nFooter.\n");
-        // tables are included as part of the text.
-        assert_extract_msgs(
+    fn extract_messages_table() {
+        let input = "\
+            | Module Type       | Description\n\
+            |-------------------|-------------------------\n\
+            | `rust_binary`     | Produces a Rust binary.\n\
+            | `rust_library`    | Produces a Rust library.\n\
+        ";
+        assert_extract_messages(
             &input,
-            vec![(1, "Hey, a table"), (3, table), (8, "Footer.")],
+            vec![
+                (1, "Module Type"),
+                (1, "Description"),
+                (3, "`rust_binary`"),
+                (3, "Produces a Rust binary."),
+                (4, "`rust_library`"),
+                (4, "Produces a Rust library."),
+            ],
         );
     }
 
     #[test]
-    fn extract_msgs_code_block() {
-        assert_extract_msgs(
+    fn extract_messages_code_block() {
+        assert_extract_messages(
             "Preamble\n```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
             vec![
                 (1, "Preamble"),
-                (
-                    2,
-                    "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```",
-                ),
+                (3, "fn hello() {\n  some_code()\n\n  todo!()\n}\n"),
                 (9, "Postamble"),
             ],
         );
     }
 
     #[test]
-    fn extract_msgs_details() {
-        // This isn't great, because the parser treats any data
-        // following a tag as also HTML, but works well enough when
-        // `<details>` has blank lines before and after.
-        assert_extract_msgs(
-            "Preamble\n<details>\nSome Details\n</details>\n\nPostamble",
+    fn extract_messages_quoted_code_block() {
+        assert_extract_messages(
+            "\
+            > Preamble\n\
+            > ```rust\n\
+            > fn hello() {\n\
+            >     some_code()\n\
+            >\n\
+            >     todo!()\n\
+            > }\n\
+            > ```\n\
+            > Postamble",
             vec![
                 (1, "Preamble"),
-                (2, "<details>\nSome Details\n</details>"),
+                (3, "fn hello() {\n    some_code()\n\n    todo!()\n}\n"),
+                (9, "Postamble"),
+            ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_details() {
+        // This isn't great: we lose text following a HTML tag:
+        assert_extract_messages(
+            "Preamble\n\
+             <details>\n\
+             Some Details\n\
+             </details>\n\
+             \n\
+             Postamble",
+            vec![
+                (1, "Preamble"), //
+                // Missing "Some Details"
                 (6, "Postamble"),
             ],
         );
-        assert_extract_msgs(
-            "Preamble\n\n<details>\n\nSome Details\n\n</details>\n\nPostamble",
+        // It works well enough when `<details>` has blank lines
+        // before and after.
+        assert_extract_messages(
+            "Preamble\n\
+             \n\
+             <details>\n\
+             \n\
+             Some Details\n\
+             \n\
+             </details>\n\
+             \n\
+             Postamble",
             vec![
-                (1, "Preamble"),
-                (3, "<details>"),
+                (1, "Preamble"), //
                 (5, "Some Details"),
-                (7, "</details>"),
                 (9, "Postamble"),
             ],
         );
     }
 
     #[test]
-    fn extract_msgs_list() {
-        assert_extract_msgs(
+    fn extract_messages_list() {
+        assert_extract_messages(
             "Some text\n * List item 1🦀\n * List item 2\n\nMore text",
             vec![
-                (1, "Some text"),
-                (2, " * List item 1🦀\n * List item 2"),
+                (1, "Some text"), //
+                (2, "List item 1🦀"),
+                (3, "List item 2"),
                 (5, "More text"),
             ],
         );
     }
 
     #[test]
-    fn extract_msgs_multilevel_list() {
-        assert_extract_msgs("Some text\n * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2\n\nMore text",
+    fn extract_messages_multilevel_list() {
+        assert_extract_messages(
+            "Some text\n * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2\n\nMore text",
             vec![
-                (1, "Some text"),
-                (2, " * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2"),
-                (7, "More text")
-            ]
+                (1, "Some text"), //
+                (2, "List item 1"),
+                (3, "List item 2"),
+                (4, "Sublist 1"),
+                (5, "Sublist 2"),
+                (7, "More text"),
+            ],
         );
     }
 
     #[test]
-    fn extract_msgs_list_with_paras() {
-        assert_extract_msgs(
+    fn extract_messages_list_with_paragraphs() {
+        assert_extract_messages(
             r#"* Item 1.
 * Item 2,
   two lines.
 
   * Sub 1.
   * Sub 2.
-
-  More paragraph.
-
-Top level.
 "#,
             vec![
-                (1, "* Item 1.\n* Item 2,\n  two lines.\n\n  * Sub 1.\n  * Sub 2.\n\n  More paragraph."),
-                (10, "Top level."),
-            ]
+                (1, "Item 1."),
+                (2, "Item 2,\ntwo lines."),
+                (5, "Sub 1."),
+                (6, "Sub 2."),
+            ],
         );
     }
 
     #[test]
-    fn extract_msgs_headings() {
-        assert_extract_msgs(
+    fn extract_messages_headings() {
+        assert_extract_messages(
             r#"Some text
 # Headline News🦀
 
@@ -481,18 +613,19 @@ Top level.
 "#,
             vec![
                 (1, "Some text"),
-                (2, "# Headline News🦀"),
-                (4, "* A\n* List"),
-                (7, "## Subheading"),
+                (2, "Headline News🦀"),
+                (4, "A"),
+                (5, "List"),
+                (7, "Subheading"),
             ],
         );
     }
 
     #[test]
-    fn extract_msgs_code_followed_by_details() {
+    fn extract_messages_code_followed_by_details() {
         // This is a regression test for an error that would
         // incorrectly combine CodeBlock and HTML.
-        assert_extract_msgs(
+        assert_extract_messages(
             r#"```bob
 BOB
 ```
@@ -504,10 +637,8 @@ BOB
 </details>
 "#,
             vec![
-                (1, "```bob\nBOB\n```"),
-                (5, "<details>"),
-                (7, "* Blah blah"),
-                (9, "</details>"),
+                (2, "BOB\n"), //
+                (7, "Blah blah"),
             ],
         );
     }
