@@ -316,6 +316,7 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     /// Extract messages in `document`, assert they match `expected`.
     #[track_caller]
