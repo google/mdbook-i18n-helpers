@@ -23,6 +23,35 @@ jobs:
       - name: Test
         run: cargo test
 
+  fuzz:
+    name: Fuzz test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install nightly Rust
+        run: rustup default nightly
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Cache fuzz corpus
+        uses: actions/cache@v3
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus
+
+      - name: Run fuzz test
+        run: cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
+
+      - name: Minimize fuzz corpus
+        run: cargo fuzz cmin group_events
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
