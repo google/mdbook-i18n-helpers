@@ -33,7 +33,7 @@ jobs:
       - name: Install nightly Rust
         run: rustup default nightly
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
