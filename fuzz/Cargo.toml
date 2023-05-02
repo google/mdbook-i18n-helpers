@@ -1,0 +1,28 @@
+[package]
+name = "mdbook-i18n-helpers-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+pretty_assertions = "1.3.0"
+
+[dependencies.mdbook-i18n-helpers]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "group_events"
+path = "fuzz_targets/group_events.rs"
+test = false
+doc = false
