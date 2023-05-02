@@ -210,20 +210,8 @@ mod tests {
     fn test_translate_multiple_paragraphs_extra_newlines() {
         // Notice how the translated paragraphs have more lines.
         let catalog = create_catalog(&[
-            (
-                "first\n\
-                 paragraph",
-                "FIRST\n\
-                 TRANSLATED\n\
-                 PARAGRAPH",
-            ),
-            (
-                "last\n\
-                 paragraph",
-                "LAST\n\
-                 TRANSLATED\n\
-                 PARAGRAPH",
-            ),
+            ("first paragraph", "FIRST TRANSLATED PARAGRAPH"),
+            ("last paragraph", "LAST TRANSLATED PARAGRAPH"),
         ]);
         // Paragraph separation is normalized when translating.
         assert_eq!(
@@ -236,13 +224,9 @@ mod tests {
                  paragraph\n",
                 &catalog
             ),
-            "FIRST\n\
-             TRANSLATED\n\
-             PARAGRAPH\n\
+            "FIRST TRANSLATED PARAGRAPH\n\
              \n\
-             LAST\n\
-             TRANSLATED\n\
-             PARAGRAPH"
+             LAST TRANSLATED PARAGRAPH"
         );
     }
 

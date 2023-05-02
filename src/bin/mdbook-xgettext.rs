@@ -216,8 +216,7 @@ mod tests {
             &[
                 "The Foo Chapter",
                 "How to Foo",
-                "The first paragraph about Foo.\n\
-                 Still the first paragraph."
+                "The first paragraph about Foo. Still the first paragraph.",
             ]
         );
 
