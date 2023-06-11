@@ -688,6 +688,13 @@ mod tests {
     }
 
     #[test]
+    fn extract_messages_broken_reference_link() {
+        // A reference link without the corresponding link definition
+        // results in an escaped link.
+        assert_extract_messages("[foo][unknown]", vec![(1, r"\[foo\]\[unknown\]")]);
+    }
+
+    #[test]
     fn extract_messages_footnotes() {
         assert_extract_messages(
             "
