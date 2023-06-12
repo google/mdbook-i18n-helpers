@@ -23,10 +23,24 @@
 //! See <https://github.com/google/mdbook-i18n-helpers> for details on
 //! how to use the supplied `mdbook` plugins.
 
-use mdbook::utils::new_cmark_parser;
 use polib::catalog::Catalog;
 use pulldown_cmark::{Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
+
+/// Like `mdbook::utils::new_cmark_parser`, but also passes a
+/// `BrokenLinkCallback`.
+pub fn new_cmark_parser<'input, 'callback>(
+    text: &'input str,
+    broken_link_callback: pulldown_cmark::BrokenLinkCallback<'input, 'callback>,
+) -> pulldown_cmark::Parser<'input, 'callback> {
+    let mut options = pulldown_cmark::Options::empty();
+    options.insert(pulldown_cmark::Options::ENABLE_TABLES);
+    options.insert(pulldown_cmark::Options::ENABLE_FOOTNOTES);
+    options.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
+    options.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
+    options.insert(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
+    pulldown_cmark::Parser::new_with_broken_link_callback(text, options, broken_link_callback)
+}
 
 /// Extract Markdown events from `text`.
 ///
@@ -84,7 +98,7 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
             .map(|(idx, line)| (idx + 1, Event::Text(line.into())))
             .collect(),
         // Otherwise, we parse the text line normally.
-        _ => new_cmark_parser(text, false)
+        _ => new_cmark_parser(text, None)
             .into_offset_iter()
             .map(|(event, range)| {
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
@@ -691,6 +705,9 @@ mod tests {
     fn extract_messages_broken_reference_link() {
         // A reference link without the corresponding link definition
         // results in an escaped link.
+        //
+        // See `SourceMap::extract_messages` for a more complex
+        // approach which can work around this in some cases.
         assert_extract_messages("[foo][unknown]", vec![(1, r"\[foo\]\[unknown\]")]);
     }
 
