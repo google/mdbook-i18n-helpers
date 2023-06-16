@@ -25,7 +25,7 @@
 
 use mdbook::utils::new_cmark_parser;
 use polib::catalog::Catalog;
-use pulldown_cmark::{Event, Tag};
+use pulldown_cmark::{Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 
 /// Extract Markdown events from `text`.
@@ -62,6 +62,18 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
         .map(|(offset, _)| offset)
         .collect::<Vec<_>>();
 
+    fn expand_shortcut_link(tag: Tag) -> Tag {
+        match tag {
+            Tag::Link(LinkType::Shortcut, reference, title) => {
+                Tag::Link(LinkType::Reference, reference, title)
+            }
+            Tag::Image(LinkType::Shortcut, reference, title) => {
+                Tag::Image(LinkType::Reference, reference, title)
+            }
+            _ => tag,
+        }
+    }
+
     match state {
         // If we're in a code block, we disable the normal parsing and
         // return lines of text. This matches the behavior of the
@@ -78,6 +90,16 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
                 let event = match event {
                     Event::SoftBreak => Event::Text(" ".into()),
+                    // Shortcut links like "[foo]" end up as "[foo]"
+                    // in output. By changing them to a reference
+                    // link, the link is expanded on the fly and the
+                    // output becomes self-contained.
+                    Event::Start(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
+                        Event::Start(expand_shortcut_link(tag))
+                    }
+                    Event::End(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
+                        Event::End(expand_shortcut_link(tag))
+                    }
                     _ => event,
                 };
                 (lineno, event)
@@ -613,7 +635,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_messages_links() {
+    fn extract_messages_inline_link() {
         assert_extract_messages(
             "See [this page](https://example.com) for more info.",
             vec![(1, "See [this page](https://example.com) for more info.")],
@@ -621,20 +643,47 @@ mod tests {
     }
 
     #[test]
-    fn extract_messages_reference_links() {
+    fn extract_messages_reference_link() {
         assert_extract_messages(
-            r#"
-* [Brazilian Portuguese][pt-BR] and
-* [Korean][ko]
-
-[pt-BR]: https://google.github.io/comprehensive-rust/pt-BR/
-[ko]: https://google.github.io/comprehensive-rust/ko/
-"#,
+            "See [this page][1] for more info.\n\n\
+             [1]: https://example.com",
             // The parser expands reference links on the fly.
-            vec![
-                (2, "[Brazilian Portuguese](https://google.github.io/comprehensive-rust/pt-BR/) and"),
-                (3, "[Korean](https://google.github.io/comprehensive-rust/ko/)"),
-            ]
+            vec![(1, "See [this page](https://example.com) for more info.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_collapsed_link() {
+        // We make the parser expand collapsed links on the fly.
+        assert_extract_messages(
+            "Click [here][]!\n\n\
+             [here]: http://example.net/",
+            vec![(1, "Click [here](http://example.net/)!")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_shortcut_link() {
+        assert_extract_messages(
+            "Click [here]!\n\n\
+             [here]: http://example.net/",
+            vec![(1, "Click [here](http://example.net/)!")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_autolink() {
+        assert_extract_messages(
+            "Visit <http://example.net>!",
+            vec![(1, "Visit <http://example.net>!")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_email() {
+        assert_extract_messages(
+            "Contact <info@example.net>!",
+            vec![(1, "Contact <info@example.net>!")],
         );
     }
 
