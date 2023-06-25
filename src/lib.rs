@@ -159,10 +159,20 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     for (idx, (_, event)) in events.iter().enumerate() {
         match event {
             Event::Start(
-                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
+                Tag::Emphasis
+                | Tag::Strong
+                | Tag::Strikethrough
+                | Tag::Link(..)
+                | Tag::Image(..)
+                | Tag::CodeBlock(..),
             )
             | Event::End(
-                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
+                Tag::Emphasis
+                | Tag::Strong
+                | Tag::Strikethrough
+                | Tag::Link(..)
+                | Tag::Image(..)
+                | Tag::CodeBlock(..),
             )
             | Event::Text(_)
             | Event::Code(_)
@@ -235,16 +245,22 @@ pub fn reconstruct_markdown(
     )
     .unwrap();
 
-    // Block quotes and lists add padding to the state. This is
+    // Block quotes and lists add padding to the state, which is
     // reflected in the rendered Markdown. We want to capture the
     // Markdown without the padding to remove the effect of these
-    // structural elements.
-    let state_without_padding = state.map(|state| State {
+    // structural elements. Similarly, we don't want extra newlines at
+    // the start.
+    let simplified_state = state.map(|state| State {
+        newlines_before_start: 0,
         padding: Vec::new(),
         ..state
     });
-    cmark_resume_with_options(events, &mut markdown, state_without_padding, options).unwrap();
-    (markdown, new_state)
+    cmark_resume_with_options(events, &mut markdown, simplified_state, options).unwrap();
+    // Even with `newlines_before_start` set to zero, we get a leading
+    // `\n` for code blocks (since they must start on a new line). We
+    // can safely trim this here since we know that we always
+    // reconstruct Markdown for a self-contained group of events.
+    (String::from(markdown.trim_matches('\n')), new_state)
 }
 
 /// Extract translatable strings from `document`.
@@ -495,9 +511,23 @@ The document[^1] text.
             "Preamble\n```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
             vec![
                 (1, "Preamble"),
-                (3, "fn hello() {\n  some_code()\n\n  todo!()\n}\n"),
+                (
+                    2,
+                    "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```",
+                ),
                 (9, "Postamble"),
             ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_two_code_blocks() {
+        // This is a bit confusing: We end up merging the two blocks
+        // because there are no other events between the two code
+        // blocks.
+        assert_extract_messages(
+            "```\nFirst block\n```\n```\nSecond block\n```",
+            vec![(1, "```\nFirst block\n```\n\n```\nSecond block\n```")],
         );
     }
 
@@ -516,7 +546,10 @@ The document[^1] text.
             > Postamble",
             vec![
                 (1, "Preamble"),
-                (3, "fn hello() {\n    some_code()\n\n    todo!()\n}\n"),
+                (
+                    2,
+                    "```rust\nfn hello() {\n    some_code()\n\n    todo!()\n}\n```",
+                ),
                 (9, "Postamble"),
             ],
         );
@@ -642,7 +675,7 @@ BOB
 </details>
 "#,
             vec![
-                (2, "BOB\n"), //
+                (1, "```bob\nBOB\n```"), //
                 (7, "Blah blah"),
             ],
         );

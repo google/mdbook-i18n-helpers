@@ -233,8 +233,12 @@ mod tests {
     #[test]
     fn test_translate_code_block() {
         let catalog = create_catalog(&[(
-            "fn foo() {\n\n    let x = 10;\n\n}\n",
-            "fn FOO() {\n\n    let X = 10;\n\n}\n",
+            "```rust,editable\n\
+             fn foo() {\n\n    let x = 10;\n\n}\n\
+             ```",
+            "```rust,editable\n\
+             fn FOO() {\n\n    let X = 10;\n\n}\n\
+             ```",
         )]);
         assert_eq!(
             translate(
