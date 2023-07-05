@@ -6,13 +6,11 @@ use pretty_assertions::assert_eq;
 
 fuzz_target!(|text: String| {
     let events = extract_events(&text, None);
-    let groups = group_events(&events);
-    let flattened_groups = groups
+    let flattened_groups = group_events(&events)
         .into_iter()
-        .map(|group| match group {
+        .flat_map(|group| match group {
             Group::Translate(events) | Group::Skip(events) => events,
         })
-        .flatten()
         .cloned()
         .collect::<Vec<_>>();
 
