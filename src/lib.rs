@@ -24,6 +24,7 @@
 //! how to use the supplied `mdbook` plugins.
 
 use mdbook::utils::new_cmark_parser;
+use polib::catalog::Catalog;
 use pulldown_cmark::{Event, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 
@@ -331,6 +332,50 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
     }
 
     messages
+}
+
+/// Translate `events` using `catalog`.
+pub fn translate_events<'a>(
+    events: &'a [(usize, Event<'a>)],
+    catalog: &'a Catalog,
+) -> Vec<(usize, Event<'a>)> {
+    let mut translated_events = Vec::new();
+    let mut state = None;
+
+    for group in group_events(&events) {
+        match group {
+            Group::Translate(events) => {
+                eprintln!("Group Events:");
+                for (_, event) in events.iter() {
+                    eprintln!("{event:?}");
+                }
+
+                // Reconstruct the message.
+                let (msgid, new_state) = reconstruct_markdown(events, state.clone());
+                let translated = catalog
+                    .find_message(None, &msgid, None)
+                    .filter(|msg| !msg.flags().is_fuzzy())
+                    .and_then(|msg| msg.msgstr().ok())
+                    .filter(|msgstr| !msgstr.is_empty());
+                // Generate new events or reuse old events.
+                match translated {
+                    Some(msgstr) => translated_events.extend(extract_events(msgstr, state)),
+                    None => translated_events.extend_from_slice(events),
+                }
+                // Advance the state.
+                state = Some(new_state);
+            }
+            Group::Skip(events) => {
+                // Copy the events unchanged to the output.
+                translated_events.extend_from_slice(events);
+                // Advance the state.
+                let (_, new_state) = reconstruct_markdown(events, state);
+                state = Some(new_state);
+            }
+        }
+    }
+
+    translated_events
 }
 
 #[cfg(test)]

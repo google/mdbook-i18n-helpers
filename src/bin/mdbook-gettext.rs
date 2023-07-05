@@ -28,45 +28,15 @@ use anyhow::{anyhow, Context};
 use mdbook::book::Book;
 use mdbook::preprocess::{CmdPreprocessor, PreprocessorContext};
 use mdbook::BookItem;
-use mdbook_i18n_helpers::{extract_events, group_events, reconstruct_markdown, Group};
+use mdbook_i18n_helpers::{extract_events, reconstruct_markdown, translate_events};
 use polib::catalog::Catalog;
 use polib::po_file;
 use semver::{Version, VersionReq};
 use std::{io, process};
 
 fn translate(text: &str, catalog: &Catalog) -> String {
-    let mut translated_events = Vec::new();
     let events = extract_events(text, None);
-    let mut state = None;
-
-    for group in group_events(&events) {
-        match group {
-            Group::Translate(events) => {
-                // Reconstruct the message.
-                let (msgid, new_state) = reconstruct_markdown(events, state.clone());
-                let translated = catalog
-                    .find_message(None, &msgid, None)
-                    .filter(|msg| !msg.flags().is_fuzzy())
-                    .and_then(|msg| msg.msgstr().ok())
-                    .filter(|msgstr| !msgstr.is_empty());
-                // Generate new events or reuse old events.
-                match translated {
-                    Some(msgstr) => translated_events.extend(extract_events(msgstr, state)),
-                    None => translated_events.extend_from_slice(events),
-                }
-                // Advance the state.
-                state = Some(new_state);
-            }
-            Group::Skip(events) => {
-                // Copy the events unchanged to the output.
-                translated_events.extend_from_slice(events);
-                // Advance the state.
-                let (_, new_state) = reconstruct_markdown(events, state);
-                state = Some(new_state);
-            }
-        }
-    }
-
+    let translated_events = translate_events(&events, catalog);
     let (translated, _) = reconstruct_markdown(&translated_events, None);
     translated
 }
