@@ -382,6 +382,10 @@ pub fn translate_events<'a>(
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use pulldown_cmark::CodeBlockKind;
+    use pulldown_cmark::Event::*;
+    use pulldown_cmark::HeadingLevel::*;
+    use pulldown_cmark::Tag::*;
 
     /// Extract messages in `document`, assert they match `expected`.
     #[track_caller]
@@ -393,6 +397,91 @@ mod tests {
                 .collect::<Vec<_>>(),
             expected,
         )
+    }
+
+    #[test]
+    fn extract_events_empty() {
+        assert_eq!(extract_events("", None), vec![]);
+    }
+
+    #[test]
+    fn extract_events_paragraph() {
+        assert_eq!(
+            extract_events("foo bar", None),
+            vec![
+                (1, Start(Paragraph)),
+                (1, Text("foo bar".into())),
+                (1, End(Paragraph)),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_events_softbreak() {
+        assert_eq!(
+            extract_events("foo\nbar", None),
+            vec![
+                (1, Start(Paragraph)),
+                (1, Text("foo".into())),
+                (1, Text(" ".into())),
+                (2, Text("bar".into())),
+                (1, End(Paragraph)),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_events_heading() {
+        assert_eq!(
+            extract_events("# Foo Bar", None),
+            vec![
+                (1, Start(Heading(H1, None, vec![]))),
+                (1, Text("Foo Bar".into())),
+                (1, End(Heading(H1, None, vec![]))),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_events_list_item() {
+        assert_eq!(
+            extract_events("* foo bar", None),
+            vec![
+                (1, Start(List(None))),
+                (1, Start(Item)),
+                (1, Text("foo bar".into())),
+                (1, End(Item)),
+                (1, End(List(None))),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_events_code_block() {
+        let (_, state) =
+            reconstruct_markdown(&[(1, Start(CodeBlock(CodeBlockKind::Indented)))], None);
+        assert_eq!(
+            extract_events("foo\nbar\nbaz", Some(state)),
+            vec![
+                (1, Text("foo\n".into())),
+                (2, Text("bar\n".into())),
+                (3, Text("baz".into())),
+            ]
+        );
+
+        // Compare with extraction without state:
+        assert_eq!(
+            extract_events("foo\nbar\nbaz", None),
+            vec![
+                (1, Start(Paragraph)),
+                (1, Text("foo".into())),
+                (1, Text(" ".into())),
+                (2, Text("bar".into())),
+                (2, Text(" ".into())),
+                (3, Text("baz".into())),
+                (1, End(Paragraph)),
+            ]
+        );
     }
 
     #[test]
