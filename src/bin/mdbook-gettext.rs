@@ -232,4 +232,30 @@ mod tests {
              Text after.",
         );
     }
+
+    #[test]
+    fn test_translate_table() {
+        let catalog = create_catalog(&[
+            ("Types", "TYPES"),
+            ("Literals", "LITERALS"),
+            ("Arrays", "ARRAYS"),
+            ("Tuples", "TUPLES"),
+        ]);
+        // The alignment is lost when we generate new Markdown.
+        assert_eq!(
+            translate(
+                "\
+                |        | Types       | Literals        |\n\
+                |--------|-------------|-----------------|\n\
+                | Arrays | `[T; N]`    | `[20, 30, 40]`  |\n\
+                | Tuples | `()`, ...   | `()`, `('x',)`  |",
+                &catalog
+            ),
+            "\
+            ||TYPES|LITERALS|\n\
+            |--|-----|--------|\n\
+            |ARRAYS|`[T; N]`|`[20, 30, 40]`|\n\
+            |TUPLES|`()`, ...|`()`, `('x',)`|",
+        );
+    }
 }
