@@ -62,7 +62,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clippy
-        run: cargo clippy -- -D clippy::dbg_macro
+        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr
 
   format:
     name: Format

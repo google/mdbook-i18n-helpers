@@ -359,11 +359,6 @@ pub fn translate_events<'a>(
     for group in group_events(&events) {
         match group {
             Group::Translate(events) => {
-                eprintln!("Group Events:");
-                for (_, event) in events.iter() {
-                    eprintln!("{event:?}");
-                }
-
                 // Reconstruct the message.
                 let (msgid, new_state) = reconstruct_markdown(events, state.clone());
                 let translated = catalog
