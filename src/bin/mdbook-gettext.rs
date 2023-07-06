@@ -81,6 +81,7 @@ fn preprocess() -> anyhow::Result<()> {
     let (ctx, book) = CmdPreprocessor::parse_input(io::stdin())?;
     let book_version = Version::parse(&ctx.mdbook_version)?;
     let version_req = VersionReq::parse(mdbook::MDBOOK_VERSION)?;
+    #[allow(clippy::print_stderr)]
     if !version_req.matches(&book_version) {
         eprintln!(
             "Warning: The gettext preprocessor was built against \
