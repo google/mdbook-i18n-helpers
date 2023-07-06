@@ -258,4 +258,48 @@ mod tests {
             |TUPLES|`()`, ...|`()`, `('x',)`|",
         );
     }
+
+    #[test]
+    fn test_footnote() {
+        let catalog = create_catalog(&[
+            ("A footnote[^note].", "A FOOTNOTE[^note]."),
+            ("More details.", "MORE DETAILS."),
+        ]);
+        assert_eq!(
+            translate("A footnote[^note].\n\n[^note]: More details.", &catalog),
+            "A FOOTNOTE[^note].\n\n[^note]: MORE DETAILS."
+        );
+    }
+
+    #[test]
+    fn test_strikethrough() {
+        let catalog = create_catalog(&[("~~foo~~", "~~FOO~~")]);
+        assert_eq!(translate("~~foo~~", &catalog), "~~FOO~~");
+    }
+
+    #[test]
+    fn test_tasklists() {
+        let catalog = create_catalog(&[("Foo", "FOO"), ("Bar", "BAR")]);
+        assert_eq!(
+            translate(
+                "\
+                - [x] Foo\n\
+                - [ ] Bar\n\
+                ",
+                &catalog
+            ),
+            "\
+            - [x] FOO\n\
+            - [ ] BAR",
+        );
+    }
+
+    #[test]
+    fn test_heading_attributes() {
+        let catalog = create_catalog(&[("Foo", "FOO"), ("Bar", "BAR")]);
+        assert_eq!(
+            translate("# Foo { #id .foo }", &catalog),
+            "# FOO {#id .foo}"
+        );
+    }
 }
