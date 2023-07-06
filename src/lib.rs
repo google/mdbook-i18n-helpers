@@ -348,6 +348,49 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
     messages
 }
 
+/// Trim `new_events` if they're wrapped in an unwanted paragraph.
+///
+/// If `new_events` is wrapped in a paragraph and `old_events` isn't,
+/// then the paragraph is removed. This is useful when a text event
+/// has been wrapped in a paragraph:
+///
+/// ```
+/// use pulldown_cmark::{Event, Tag};
+/// use mdbook_i18n_helpers::{extract_events, reconstruct_markdown, trim_paragraph};
+///
+/// let old_events = vec![(1, Event::Text("A line of text".into()))];
+/// let (markdown, _) = reconstruct_markdown(&old_events, None);
+/// let new_events = extract_events(&markdown, None);
+/// // The stand-alone text has been wrapped in an extra paragraph:
+/// assert_eq!(
+///     new_events,
+///     &[
+///         (1, Event::Start(Tag::Paragraph)),
+///         (1, Event::Text("A line of text".into())),
+///         (1, Event::End(Tag::Paragraph)),
+///     ],
+/// );
+///
+/// assert_eq!(
+///     trim_paragraph(&new_events, &old_events),
+///     &[(1, Event::Text("A line of text".into()))],
+/// );
+/// ```
+pub fn trim_paragraph<'a, 'event>(
+    new_events: &'a [(usize, Event<'event>)],
+    old_events: &'a [(usize, Event<'event>)],
+) -> &'a [(usize, Event<'event>)] {
+    use pulldown_cmark::Event::{End, Start};
+    use pulldown_cmark::Tag::Paragraph;
+    match new_events {
+        [(_, Start(Paragraph)), inner @ .., (_, End(Paragraph))] => match old_events {
+            [(_, Start(Paragraph)), .., (_, End(Paragraph))] => new_events,
+            [..] => inner,
+        },
+        [..] => new_events,
+    }
+}
+
 /// Translate `events` using `catalog`.
 pub fn translate_events<'a>(
     events: &'a [(usize, Event<'a>)],
@@ -366,9 +409,15 @@ pub fn translate_events<'a>(
                     .filter(|msg| !msg.flags().is_fuzzy())
                     .and_then(|msg| msg.msgstr().ok())
                     .filter(|msgstr| !msgstr.is_empty());
-                // Generate new events or reuse old events.
                 match translated {
-                    Some(msgstr) => translated_events.extend(extract_events(msgstr, state)),
+                    Some(msgstr) => {
+                        // Generate new events for `msgstr`, taking
+                        // care to trim away unwanted paragraphs.
+                        translated_events.extend_from_slice(trim_paragraph(
+                            &extract_events(msgstr, state),
+                            events,
+                        ));
+                    }
                     None => translated_events.extend_from_slice(events),
                 }
                 // Advance the state.
