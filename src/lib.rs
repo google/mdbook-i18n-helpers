@@ -114,17 +114,15 @@ pub enum Group<'a> {
 /// use mdbook_i18n_helpers::{extract_events, group_events, Group};
 /// use pulldown_cmark::{Event, Tag};
 ///
-/// let events = extract_events("This is a _paragraph_ of text.", None);
+/// let events = extract_events("- A list item.", None);
 /// assert_eq!(
 ///     events,
 ///     vec![
-///         (1, Event::Start(Tag::Paragraph)),
-///         (1, Event::Text("This is a ".into())),
-///         (1, Event::Start(Tag::Emphasis)),
-///         (1, Event::Text("paragraph".into())),
-///         (1, Event::End(Tag::Emphasis)),
-///         (1, Event::Text(" of text.".into())),
-///         (1, Event::End(Tag::Paragraph)),
+///         (1, Event::Start(Tag::List(None))),
+///         (1, Event::Start(Tag::Item)),
+///         (1, Event::Text("A list item.".into())),
+///         (1, Event::End(Tag::Item)),
+///         (1, Event::End(Tag::List(None))),
 ///     ],
 /// );
 ///
@@ -133,17 +131,15 @@ pub enum Group<'a> {
 ///     groups,
 ///     vec![
 ///         Group::Skip(&[
-///             (1, Event::Start(Tag::Paragraph)),
+///             (1, Event::Start(Tag::List(None))),
+///             (1, Event::Start(Tag::Item)),
 ///         ]),
 ///         Group::Translate(&[
-///             (1, Event::Text("This is a ".into())),
-///             (1, Event::Start(Tag::Emphasis)),
-///             (1, Event::Text("paragraph".into())),
-///             (1, Event::End(Tag::Emphasis)),
-///             (1, Event::Text(" of text.".into())),
+///             (1, Event::Text("A list item.".into())),
 ///         ]),
 ///         Group::Skip(&[
-///             (1, Event::End(Tag::Paragraph)),
+///             (1, Event::End(Tag::Item)),
+///             (1, Event::End(Tag::List(None))),
 ///         ]),
 ///     ]
 /// );
@@ -151,29 +147,46 @@ pub enum Group<'a> {
 pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     let mut groups = Vec::new();
 
+    #[derive(Debug)]
     enum State {
         Translate(usize),
         Skip(usize),
     }
+
+    impl State {
+        fn into_group<'a>(self, idx: usize, events: &'a [(usize, Event<'a>)]) -> Group<'a> {
+            match self {
+                State::Translate(start) => Group::Translate(&events[start..idx]),
+                State::Skip(start) => Group::Skip(&events[start..idx]),
+            }
+        }
+    }
+
     let mut state = State::Skip(0);
 
     for (idx, (_, event)) in events.iter().enumerate() {
         match event {
+            // These block-level events force new groups. We do this
+            // because we want to include these events in the group to
+            // make the group self-contained.
+            Event::Start(Tag::Paragraph | Tag::CodeBlock(..)) => {
+                // A translatable group starts here.
+                groups.push(state.into_group(idx, events));
+                state = State::Translate(idx);
+            }
+            Event::End(Tag::Paragraph | Tag::CodeBlock(..)) => {
+                // A translatable group ends after `idx`.
+                let idx = idx + 1;
+                groups.push(state.into_group(idx, events));
+                state = State::Skip(idx);
+            }
+
+            // Inline events start or continue a translating group.
             Event::Start(
-                Tag::Emphasis
-                | Tag::Strong
-                | Tag::Strikethrough
-                | Tag::Link(..)
-                | Tag::Image(..)
-                | Tag::CodeBlock(..),
+                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
             )
             | Event::End(
-                Tag::Emphasis
-                | Tag::Strong
-                | Tag::Strikethrough
-                | Tag::Link(..)
-                | Tag::Image(..)
-                | Tag::CodeBlock(..),
+                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
             )
             | Event::Text(_)
             | Event::Code(_)
@@ -187,9 +200,10 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                     state = State::Translate(idx);
                 }
             }
+
+            // All other block-level events start or continue a
+            // skipping group.
             _ => {
-                // If we're currently translating, then a new
-                // skippable group starts here.
                 if let State::Translate(start) = state {
                     groups.push(Group::Translate(&events[start..idx]));
                     state = State::Skip(idx);
@@ -656,12 +670,18 @@ The document[^1] text.
 
     #[test]
     fn extract_messages_two_code_blocks() {
-        // This is a bit confusing: We end up merging the two blocks
-        // because there are no other events between the two code
-        // blocks.
         assert_extract_messages(
-            "```\nFirst block\n```\n```\nSecond block\n```",
-            vec![(1, "```\nFirst block\n```\n\n```\nSecond block\n```")],
+            "```\n\
+             First block\n\
+             ```\n\
+             ```\n\
+             Second block\n\
+             ```\n\
+             ",
+            vec![
+                (1, "```\nFirst block\n```"), //
+                (4, "```\nSecond block\n```"),
+            ],
         );
     }
 
