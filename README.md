@@ -12,7 +12,12 @@ Support for translations is a
 
 They've been used successfully to translate [Comprehensive Rust 🦀].
 
-[Comprehensive Rust 🦀]: https://google.github.io/comprehensive-rust/running-the-course/translations.html
+## Use Cases
+
+Please add your project below if it uses this infrastructure for translations:
+
+- [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
+- [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
 
 ## Installation
 
