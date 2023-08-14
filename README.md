@@ -17,7 +17,7 @@ They've been used successfully to translate [Comprehensive Rust 🦀].
 Please add your project below if it uses this infrastructure for translations:
 
 - [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
-- [GB ASM Tutorial](https://gbdev.io/gb-asm-tutorial/)
+- [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
 
 ## Installation
 
