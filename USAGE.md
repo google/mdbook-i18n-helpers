@@ -10,12 +10,14 @@ Run
 $ cargo install mdbook-i18n-helpers
 ```
 
-to install the two binaries in this repository:
+to install three binaries:
 
 - `mdbook-xgettext`: This program extracts the source text. It is an
   [`mdbook` renderer].
 - `mdbook-gettext`: This program translates the book into a target language. It
   is an [`mdbook` preprocessor].
+- `mdbook-i18n-normalize`: This program normalizs a PO file. Use it after
+  breaking changes.
 
 [`mdbook` renderer]: https://rust-lang.github.io/mdBook/format/configuration/renderers.html
 [`mdbook` preprocessor]: https://rust-lang.github.io/mdBook/format/configuration/preprocessors.html
@@ -179,3 +181,64 @@ extra-watch-dirs = ["po"]
 Please see the [`publish.yml`] workflow in the Comprehensive Rust 🦀 repository.
 
 [`publish.yml`]: https://github.com/google/comprehensive-rust/blob/main/.github/workflows/publish.yml
+
+## Normalizing Existing PO Files
+
+When mdbook-i18n-helpers change, the generated PO files change as well. This can
+result in a situation where the messages in a `xx.po` file are no longer exactly
+like the ones expected by `mdbook-gettext`.
+
+An example is the change from version 0.1.0 to 0.2.0: `mdbook-xgettext` from
+version 0.1.0 will output a list as a whole:
+
+```markdown
+- foo
+- bar
+```
+
+becomes
+
+```gettext
+msgid ""
+"- foo\n"
+"- bar\n"
+msgstr ""
+```
+
+in the PO file. However, `mdbook-xgettext` version 0.2.0 will produce two
+messages instead:
+
+```gettext
+msgid "foo"
+msgstr ""
+
+msgid "bar"
+msgstr ""
+```
+
+Use `mdbook-i18n-normalize` version 0.2.0 to convert the old PO file to the new
+format. Importantly, existing translations are kept intact! If the old PO file
+is translated like this
+
+```gettext
+msgid ""
+"- foo\n"
+"- bar\n"
+msgstr ""
+"- FOO\n"
+"- BAR\n"
+```
+
+then the new PO file generated with `mdbook-i18n-normalize` will contain two
+messages:
+
+```gettext
+msgid "foo"
+msgstr "FOO"
+
+msgid "bar"
+msgstr "BAR"
+```
+
+You will only need to run `mdbook-i18n-normalize` once after upgrading
+mdbook-i18n-helpers.
