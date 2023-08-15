@@ -7,7 +7,7 @@ edition = "2021"
 keywords = ["mdbook", "i18n", "translation", "gettext"]
 license = "Apache-2.0"
 repository = "https://github.com/google/mdbook-i18n-helpers"
-description = "Helpers for a mdbook i18n workflow based on Gettext."
+description = "Plugins for a mdbook translation workflow based on Gettext."
 
 [dependencies]
 anyhow = "1.0.68"
