@@ -435,7 +435,7 @@ pub fn translate_events<'a>(
     let mut translated_events = Vec::new();
     let mut state = None;
 
-    for group in group_events(&events) {
+    for group in group_events(events) {
         match group {
             Group::Translate(events) => {
                 // Reconstruct the message.
@@ -758,7 +758,7 @@ The document[^1] text.
             | `rust_library`    | Produces a Rust library.\n\
         ";
         assert_extract_messages(
-            &input,
+            input,
             vec![
                 (1, "Module Type"),
                 (1, "Description"),

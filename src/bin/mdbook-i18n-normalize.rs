@@ -118,7 +118,7 @@ impl<'a> SourceMap<'a> {
         // using all other messages with the same path. This way the
         // link should be defined.
         let document = field.project(message.msgid(), message.msgstr()?);
-        if !has_broken_link(&document) {
+        if !has_broken_link(document) {
             return Ok(extract_messages(document));
         }
 
