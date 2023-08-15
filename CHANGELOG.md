@@ -2,6 +2,10 @@
 
 This lists the most important changes between releases.
 
+## Version 0.2.1 (2023-08-15)
+
+- [#56]: Handle normalization where old `msgid` disappears.
+
 ## Version 0.2.0 (2023-08-15)
 
 > This is a breaking release. Please make sure to run `mdbook-i18n-normalize` on
@@ -16,6 +20,7 @@ This lists the most important changes between releases.
 
 First release as a stand-alone crate.
 
+[#56]: https://github.com/google/mdbook-i18n-helpers/pull/56
 [#49]: https://github.com/google/mdbook-i18n-helpers/pull/49
 [#46]: https://github.com/google/mdbook-i18n-helpers/pull/46
 [#27]: https://github.com/google/mdbook-i18n-helpers/pull/27
