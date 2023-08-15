@@ -10,8 +10,6 @@ The plugins here makes it easy to translate documentation written in
 Support for translations is a
 [long-stading feature request for `mdbook`](https://github.com/rust-lang/mdBook/issues/5).
 
-They've been used successfully to translate [Comprehensive Rust 🦀].
-
 ## Use Cases
 
 Please add your project below if it uses this infrastructure for translations:
