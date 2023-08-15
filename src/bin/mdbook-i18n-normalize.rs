@@ -172,6 +172,13 @@ pub fn normalize(catalog: Catalog) -> anyhow::Result<Catalog> {
     let mut new_messages = Vec::new();
     for message in catalog.messages() {
         let new_msgids = source_map.extract_messages(message, MessageField::Msgid)?;
+        if new_msgids.is_empty() {
+            // Continue if there is nothing to normalize. This can
+            // happen if the old `msgid` is something like "<b>Foo"
+            // since we no longer extract HTML elements.
+            continue;
+        }
+
         let mut new_msgstrs = source_map.extract_messages(message, MessageField::Msgstr)?;
         let mut flags = MessageFlags::new();
         if message.is_fuzzy() || (message.is_translated() && new_msgids.len() != new_msgstrs.len())
@@ -456,6 +463,13 @@ mod tests {
             catalog,
             &[fuzzy("foo", "FOO"), fuzzy("bar", "BAR"), fuzzy("baz", "")],
         );
+    }
+
+    #[test]
+    fn test_normalize_disappearing_html() {
+        // Normalizing "<b>" results in no messages.
+        let catalog = create_catalog(&[("<b>", "FOO")]);
+        assert_normalized_messages_eq(catalog, &[]);
     }
 
     #[test]
