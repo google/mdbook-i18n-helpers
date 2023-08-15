@@ -29,6 +29,10 @@ $ cargo install mdbook-i18n-helpers
 
 Please see [USAGE](USAGE.md) for how to translate your `mdbook` project.
 
+## Changelog
+
+Please see [CHANGELOG](CHANGELOG.md) for details on the changes in each release.
+
 ## Contact
 
 For questions or comments, please contact
