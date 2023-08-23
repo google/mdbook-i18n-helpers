@@ -434,7 +434,7 @@ dependencies = [
 
 [[package]]
 name = "mdbook-i18n-helpers"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "anyhow",
  "mdbook",
