@@ -11,6 +11,8 @@
 //! losing existing translations.
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 
 use anyhow::{bail, Context};
@@ -130,7 +132,10 @@ impl<'a> SourceMap<'a> {
             None => return Ok(extract_messages(document)),
         };
 
-        // Construct a full document using all messages from `path`.
+        // First, we try constructing a document using other messages
+        // from the catalog. Catalogs from pre-0.1.0 included the link
+        // definitions.
+        //
         // This will have quadratic complexity in case every message
         // from `path` has a "[some text][1]" link which needs to be
         // resolved using a table of link definitions as the bottom.
@@ -144,6 +149,15 @@ impl<'a> SourceMap<'a> {
             }
             full_document.push_str("\n\n");
             full_document.push_str(msg);
+        }
+
+        // Second, we attempt to add the original source file.
+        // Catalogs made with version 0.1.0 to 0.2.0 did not include
+        // the link definitions at all, so we need to rely on the
+        // source data (if we can find it).
+        if let Ok(mut file) = File::open(path) {
+            full_document.push_str("\n\n");
+            let _ = file.read_to_string(&mut full_document);
         }
 
         let mut messages = extract_messages(&full_document);
