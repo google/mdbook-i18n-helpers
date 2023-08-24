@@ -7,7 +7,7 @@ How to use the translation infrastructure with your `mdbook` project.
 Run
 
 ```shell
-$ cargo install mdbook-i18n-helpers
+cargo install mdbook-i18n-helpers
 ```
 
 to install three binaries:
@@ -77,7 +77,7 @@ To extract the original text and generate a `messages.pot` file, you run
 `mdbook` with the `mdbook-xgettext` renderer:
 
 ```shell
-$ MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' \
+MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' \
   mdbook build -d po
 ```
 
@@ -89,7 +89,7 @@ To start a new translation for a fictional `xx` locale, first generate the
 `po/messages.pot` file. Then use `msginit` to create a `xx.po` file:
 
 ```shell
-$ msginit -i po/messages.pot -l xx -o po/xx.po
+msginit -i po/messages.pot -l xx -o po/xx.po
 ```
 
 You can also simply copy `po/messages.pot` to `po/xx.po` if you don't have
@@ -110,7 +110,7 @@ the `po/xx.po` file with new messages, first extract the source text into a
 `po/messages.pot` template file. Then run
 
 ```shell
-$ msgmerge --update po/xx.po po/messages.pot
+msgmerge --update po/xx.po po/messages.pot
 ```
 
 Unchanged messages will stay intact, deleted messages are marked as old, and
@@ -153,7 +153,7 @@ To use the `po/xx.po` file for your output, you simply set `book.language` to
 `xx`. You can do this on the command line:
 
 ```shell
-$ MDBOOK_BOOK__LANGUAGE=xx mdbook build -d book/xx
+MDBOOK_BOOK__LANGUAGE=xx mdbook build -d book/xx
 ```
 
 This will set the book's language to `xx` and store the generated files in
@@ -165,7 +165,7 @@ Like normal, you can use `mdbook serve` to view your translation as you work on
 it. You use the same command as with `mdbook build` above:
 
 ```shell
-$ MDBOOK_BOOK__LANGUAGE=xx mdbook serve -d book/xx
+MDBOOK_BOOK__LANGUAGE=xx mdbook serve -d book/xx
 ```
 
 To automatically reload the book when you change the `po/xx.po` file, add this
