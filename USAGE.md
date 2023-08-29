@@ -182,6 +182,34 @@ Please see the [`publish.yml`] workflow in the Comprehensive Rust 🦀 repositor
 
 [`publish.yml`]: https://github.com/google/comprehensive-rust/blob/main/.github/workflows/publish.yml
 
+## Marking Sections to be Skipped for Translation
+
+A block can be marked to be skipped for translation by prepending a special HTML
+comment `<!--- mdbook-xgettext:skip -->` to it.
+
+For example:
+
+````markdown
+The following code block should not be translated.
+
+<!--- mdbook-xgettext:skip -->
+
+```
+fn hello() {
+  println!("Hello world!");
+}
+```
+
+Itemized list:
+
+- A should be translated.
+
+<!--- mdbook-xgettext:skip -->
+
+- B should be skipped.
+- C should be translated.
+````
+
 ## Normalizing Existing PO Files
 
 When mdbook-i18n-helpers change, the generated PO files change as well. This can
