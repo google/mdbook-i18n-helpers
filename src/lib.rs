@@ -24,7 +24,7 @@
 //! how to use the supplied `mdbook` plugins.
 
 use polib::catalog::Catalog;
-use pulldown_cmark::{Event, LinkType, Tag};
+use pulldown_cmark::{CowStr, Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 use regex::Regex;
 use std::sync::OnceLock;
@@ -90,6 +90,38 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
         }
     }
 
+    fn expand_event(event: Event) -> Vec<Event> {
+        match event {
+            Event::SoftBreak => vec![Event::Text(" ".into())],
+            // Shortcut links like "[foo]" end up as "[foo]"
+            // in output. By changing them to a reference
+            // link, the link is expanded on the fly and the
+            // output becomes self-contained.
+            Event::Start(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
+                vec![Event::Start(expand_shortcut_link(tag))]
+            }
+            Event::End(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
+                vec![Event::End(expand_shortcut_link(tag))]
+            }
+            Event::Html(text) => {
+                // WARNING: the following is a hack to try to
+                // work around the behavior of the parser when
+                // it runs into HTML.
+                match split_first_html_comment(&text) {
+                    Some((comment, after_comment)) => {
+                        if !after_comment.trim().is_empty() {
+                            vec![Event::Html(comment), Event::Text(after_comment)]
+                        } else {
+                            vec![Event::Html(comment)]
+                        }
+                    }
+                    None => vec![Event::Html(text)],
+                }
+            }
+            _ => vec![event],
+        }
+    }
+
     match state {
         // If we're in a code block, we disable the normal parsing and
         // return lines of text. This matches the behavior of the
@@ -102,25 +134,44 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
         // Otherwise, we parse the text line normally.
         _ => new_cmark_parser(text, None)
             .into_offset_iter()
-            .map(|(event, range)| {
+            .flat_map(|(event, range)| {
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
-                let event = match event {
-                    Event::SoftBreak => Event::Text(" ".into()),
-                    // Shortcut links like "[foo]" end up as "[foo]"
-                    // in output. By changing them to a reference
-                    // link, the link is expanded on the fly and the
-                    // output becomes self-contained.
-                    Event::Start(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
-                        Event::Start(expand_shortcut_link(tag))
-                    }
-                    Event::End(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
-                        Event::End(expand_shortcut_link(tag))
-                    }
-                    _ => event,
-                };
-                (lineno, event)
+                expand_event(event)
+                    .into_iter()
+                    .map(move |event| (lineno, event))
+                    .collect::<Vec<_>>()
             })
             .collect(),
+    }
+}
+
+/// Given a html string that begins with an HTML comment, splits the
+/// string into two parts: the HTML comment, followed by the content
+/// following the comment.  This is to workaround an issue:
+/// https://github.com/raphlinus/pulldown-cmark/issues/712
+fn split_first_html_comment<'a>(html: &CowStr<'a>) -> Option<(CowStr<'a>, CowStr<'a>)> {
+    const COMMENT_START: &str = "<!--";
+    const COMMENT_END: &str = "-->";
+
+    let start_index = html.find(COMMENT_START)?;
+    if start_index != 0 {
+        return None;
+    }
+
+    let comment_start_index = COMMENT_START.len();
+    let comment_end_index =
+        html[comment_start_index..].find(COMMENT_END)? + comment_start_index + COMMENT_END.len();
+
+    // Slice and preserve CowStr::Borrowed state when possible:
+    match html {
+        CowStr::Borrowed(b) => {
+            let (comment, rest) = b.split_at(comment_end_index);
+            Some((comment.into(), rest.into()))
+        }
+        _ => {
+            let (comment, rest) = html.split_at(comment_end_index);
+            Some((comment.to_owned().into(), rest.to_owned().into()))
+        }
     }
 }
 
@@ -657,11 +708,63 @@ mod tests {
         assert_eq!(
             extract_events("<!--- mdbook-xgettext:skip -->\nHello", None),
             vec![
-                (1, Html("<!--- mdbook-xgettext:skip -->\n".into())),
+                (1, Html("<!--- mdbook-xgettext:skip -->".into())),
                 (2, Start(Paragraph)),
                 (2, Text("Hello".into())),
                 (2, End(Paragraph)),
             ]
+        );
+    }
+
+    #[test]
+    fn split_first_html_comment_empty() {
+        assert_eq!(split_first_html_comment(&"".into()), None);
+    }
+
+    #[test]
+    fn split_first_html_comment_no_comment() {
+        assert_eq!(split_first_html_comment(&"not-a-comment".into()), None);
+    }
+
+    #[test]
+    fn split_first_html_comment_comment_borrowed_alone() {
+        let html = "<!-- hello -->";
+        assert_eq!(
+            split_first_html_comment(&CowStr::Borrowed(&html)),
+            Some((CowStr::Borrowed(&html), "".into()))
+        );
+    }
+
+    #[test]
+    fn split_first_html_comment_borrowed() {
+        let html = "<!-- blah --> after comment";
+        let (left_chunk, right_chunk) = html.split_at(13);
+        // Sanity check to make sure we are looking at the expected substrings
+        assert_eq!(left_chunk, "<!-- blah -->");
+        assert_eq!(right_chunk, " after comment");
+
+        assert_eq!(
+            split_first_html_comment(&CowStr::Borrowed(&html)),
+            Some((CowStr::Borrowed(left_chunk), CowStr::Borrowed(right_chunk)))
+        );
+    }
+
+    #[test]
+    fn split_first_html_comment_boxed() {
+        assert_eq!(
+            split_first_html_comment(&CowStr::Boxed("<!-- blah --> after comment".into())),
+            Some((
+                CowStr::Boxed("<!-- blah -->".into()),
+                CowStr::Boxed(" after comment".into())
+            ))
+        );
+    }
+
+    #[test]
+    fn split_first_html_comment_ignore_nonleading_comment() {
+        assert_eq!(
+            split_first_html_comment(&"pause <!-- blah  --> after comment".into()),
+            None
         );
     }
 
@@ -1170,23 +1273,14 @@ But *this* should!",
     }
 
     #[test]
-    fn extract_messages_skipping_inline_second_item_buggy() {
-        // This isn't great: we lose text following a HTML comment.
-        // Very similar to the failure mode of the
-        // `extract_messages_details` test.
-        //
-        // The root cause appears to be a bug in the Markdown parser
-        // because it's not separating HTML element from text that
-        // immediately follows it.
-        //
-        // Related: https://github.com/raphlinus/pulldown-cmark/issues/712
+    fn extract_messages_skipping_inline_second_item() {
         assert_extract_messages(
             "
 * A
 * <!--- mdbook-xgettext:skip --> B
 * C
 ",
-            vec![(2, "A")],
+            vec![(2, "A"), (4, "C")],
         );
     }
 
