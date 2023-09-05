@@ -26,6 +26,8 @@
 use polib::catalog::Catalog;
 use pulldown_cmark::{Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
+use regex::Regex;
+use std::sync::OnceLock;
 
 /// Like `mdbook::utils::new_cmark_parser`, but also passes a
 /// `BrokenLinkCallback`.
@@ -184,21 +186,53 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     let mut groups = Vec::new();
 
     #[derive(Debug)]
+    struct GroupingContext {
+        skip_next_group: bool,
+        // TODO: this struct is planned to expand with translator
+        // comments and message contexts.
+    }
+    impl GroupingContext {
+        fn clear_skip_next_group(self) -> Self {
+            Self {
+                skip_next_group: false,
+            }
+        }
+    }
+
+    #[derive(Debug)]
     enum State {
         Translate(usize),
         Skip(usize),
     }
 
     impl State {
-        fn into_group<'a>(self, idx: usize, events: &'a [(usize, Event<'a>)]) -> Group<'a> {
+        /// Creates a group based on the capturing state and context.
+        fn into_group<'a>(
+            self,
+            idx: usize,
+            events: &'a [(usize, Event<'a>)],
+            ctx: GroupingContext,
+        ) -> (Group<'a>, GroupingContext) {
             match self {
-                State::Translate(start) => Group::Translate(&events[start..idx]),
-                State::Skip(start) => Group::Skip(&events[start..idx]),
+                State::Translate(start) => {
+                    if ctx.skip_next_group {
+                        (
+                            Group::Skip(&events[start..idx]),
+                            ctx.clear_skip_next_group(),
+                        )
+                    } else {
+                        (Group::Translate(&events[start..idx]), ctx)
+                    }
+                }
+                State::Skip(start) => (Group::Skip(&events[start..idx]), ctx),
             }
         }
     }
 
     let mut state = State::Skip(0);
+    let mut ctx = GroupingContext {
+        skip_next_group: false,
+    };
 
     for (idx, (_, event)) in events.iter().enumerate() {
         match event {
@@ -207,13 +241,19 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
             // make the group self-contained.
             Event::Start(Tag::Paragraph | Tag::CodeBlock(..)) => {
                 // A translatable group starts here.
-                groups.push(state.into_group(idx, events));
+                let next_group;
+                (next_group, ctx) = state.into_group(idx, events, ctx);
+                groups.push(next_group);
+
                 state = State::Translate(idx);
             }
             Event::End(Tag::Paragraph | Tag::CodeBlock(..)) => {
                 // A translatable group ends after `idx`.
                 let idx = idx + 1;
-                groups.push(state.into_group(idx, events));
+                let next_group;
+                (next_group, ctx) = state.into_group(idx, events, ctx);
+                groups.push(next_group);
+
                 state = State::Skip(idx);
             }
 
@@ -231,17 +271,41 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
             | Event::HardBreak => {
                 // If we're currently skipping, then a new
                 // translatable group starts here.
-                if let State::Skip(start) = state {
-                    groups.push(Group::Skip(&events[start..idx]));
+                if let State::Skip(_) = state {
+                    let next_group;
+                    (next_group, ctx) = state.into_group(idx, events, ctx);
+                    groups.push(next_group);
+
                     state = State::Translate(idx);
                 }
+            }
+
+            // An HTML comment directive to skip the next translation
+            // group.
+            Event::Html(s) if is_comment_skip_directive(s) => {
+                // If in the middle of translation, finish it.
+                if let State::Translate(_) = state {
+                    let next_group;
+                    (next_group, ctx) = state.into_group(idx, events, ctx);
+                    groups.push(next_group);
+
+                    // Restart translation: subtle but should be
+                    // needed to handle the skipping of the rest of
+                    // the inlined content.
+                    state = State::Translate(idx);
+                }
+
+                ctx.skip_next_group = true;
             }
 
             // All other block-level events start or continue a
             // skipping group.
             _ => {
-                if let State::Translate(start) = state {
-                    groups.push(Group::Translate(&events[start..idx]));
+                if let State::Translate(_) = state {
+                    let next_group;
+                    (next_group, ctx) = state.into_group(idx, events, ctx);
+                    groups.push(next_group);
+
                     state = State::Skip(idx);
                 }
             }
@@ -254,6 +318,15 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     }
 
     groups
+}
+
+/// Check whether the HTML is a directive to skip the next translation group.
+fn is_comment_skip_directive(html: &str) -> bool {
+    static RE: OnceLock<Regex> = OnceLock::new();
+
+    let re =
+        RE.get_or_init(|| Regex::new(r"<!-{2,}\s*mdbook-xgettext\s*:\s*skip\s*-{2,}>").unwrap());
+    re.is_match(html.trim())
 }
 
 /// Render a slice of Markdown events back to Markdown.
@@ -365,6 +438,7 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
     let events = extract_events(document, None);
     let mut messages = Vec::new();
     let mut state = None;
+
     for group in group_events(&events) {
         match group {
             Group::Translate(events) => {
@@ -574,6 +648,19 @@ mod tests {
                 (2, Text(" ".into())),
                 (3, Text("baz".into())),
                 (1, End(Paragraph)),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_events_comments() {
+        assert_eq!(
+            extract_events("<!--- mdbook-xgettext:skip -->\nHello", None),
+            vec![
+                (1, Html("<!--- mdbook-xgettext:skip -->\n".into())),
+                (2, Start(Paragraph)),
+                (2, Text("Hello".into())),
+                (2, End(Paragraph)),
             ]
         );
     }
@@ -949,6 +1036,168 @@ BOB
                 (1, "```bob\nBOB\n```"), //
                 (7, "Blah blah"),
             ],
+        );
+    }
+
+    #[test]
+    fn test_is_comment_skip_directive_simple() {
+        assert_eq!(
+            is_comment_skip_directive("<!-- mdbook-xgettext:skip -->"),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_comment_skip_directive_tolerates_spaces() {
+        assert_eq!(
+            is_comment_skip_directive("<!-- mdbook-xgettext: skip -->"),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_comment_skip_directive_tolerates_dashes() {
+        assert_eq!(
+            is_comment_skip_directive("<!--- mdbook-xgettext:skip ---->"),
+            true
+        );
+    }
+
+    #[test]
+    fn test_is_comment_skip_directive_needs_skip() {
+        assert_eq!(
+            is_comment_skip_directive("<!-- mdbook-xgettext: foo -->"),
+            false
+        );
+    }
+    #[test]
+    fn test_is_comment_skip_directive_needs_to_be_a_comment() {
+        assert_eq!(
+            is_comment_skip_directive("<div>mdbook-xgettext: skip</div>"),
+            false
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_simple() {
+        assert_extract_messages(
+            r#"<!--- mdbook-xgettext:skip -->
+
+This is a paragraph."#,
+            vec![],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_next_paragraph_ok() {
+        assert_extract_messages(
+            r#"<!--- mdbook-xgettext:skip -->
+This is a paragraph.
+
+This should be translated.
+"#,
+            vec![(4, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_next_codeblock() {
+        assert_extract_messages(
+            r#"<!--- mdbook-xgettext:skip -->
+```
+def f(x): return x * x
+```
+This should be translated.
+"#,
+            vec![(5, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_back_to_back() {
+        assert_extract_messages(
+            r#"<!--- mdbook-xgettext:skip -->
+```
+def f(x): return x * x
+```
+<!--- mdbook-xgettext:skip -->
+This should not translated.
+
+But *this* should!
+"#,
+            vec![(8, "But _this_ should!")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_inline_skips() {
+        assert_extract_messages(
+            "
+this should be translated <!--- mdbook-xgettext:skip --> but not this.
+... nor this.
+
+But *this* should!",
+            vec![(2, "this should be translated "), (5, "But _this_ should!")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skipping_second_item() {
+        assert_extract_messages(
+            "
+* A
+<!--- mdbook-xgettext:skip -->
+* B
+* C
+",
+            vec![(2, "A"), (5, "C")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skipping_second_paragraphed_item() {
+        assert_extract_messages(
+            "
+* A
+
+<!--- mdbook-xgettext:skip -->
+* B
+
+* C
+",
+            vec![(2, "A"), (7, "C")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skipping_inline_second_item_buggy() {
+        // This isn't great: we lose text following a HTML comment.
+        // Very similar to the failure mode of the
+        // `extract_messages_details` test.
+        //
+        // The root cause appears to be a bug in the Markdown parser
+        // because it's not separating HTML element from text that
+        // immediately follows it.
+        //
+        // Related: https://github.com/raphlinus/pulldown-cmark/issues/712
+        assert_extract_messages(
+            "
+* A
+* <!--- mdbook-xgettext:skip --> B
+* C
+",
+            vec![(2, "A")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_inline_skip_to_end_of_block() {
+        assert_extract_messages(
+            "foo <!--- mdbook-xgettext:skip --> **bold** bar
+still skipped
+
+not-skipped",
+            vec![(1, "foo "), (4, "not-skipped")],
         );
     }
 }
