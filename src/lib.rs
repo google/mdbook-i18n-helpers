@@ -1170,16 +1170,15 @@ But *this* should!",
     }
 
     #[test]
-    fn extract_messages_skipping_inline_second_item_buggy() {
+    fn extract_messages_skipping_inline_second_item() {
         // This isn't great: we lose text following a HTML comment.
         // Very similar to the failure mode of the
         // `extract_messages_details` test.
         //
-        // The root cause appears to be a bug in the Markdown parser
-        // because it's not separating HTML element from text that
-        // immediately follows it.
-        //
-        // Related: https://github.com/raphlinus/pulldown-cmark/issues/712
+        // The root cause is due to the Markdown spec and how the
+        // Markdown parser treats HTML blocks.  The text that
+        // immediately follows an HTML block on the same line is
+        // included as part of the HTML block.
         assert_extract_messages(
             "
 * A
