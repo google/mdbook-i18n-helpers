@@ -220,6 +220,8 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                             Group::Skip(&events[start..idx]),
                             ctx.clear_skip_next_group(),
                         )
+                    } else if is_nontranslatable_codeblock_group(&events[start..idx]) {
+                        (Group::Skip(&events[start..idx]), ctx)
                     } else {
                         (Group::Translate(&events[start..idx]), ctx)
                     }
@@ -327,6 +329,20 @@ fn is_comment_skip_directive(html: &str) -> bool {
     let re =
         RE.get_or_init(|| Regex::new(r"<!-{2,}\s*mdbook-xgettext\s*:\s*skip\s*-{2,}>").unwrap());
     re.is_match(html.trim())
+}
+
+/// Returns true if the events appear to be a codeblock without translatable text.
+fn is_nontranslatable_codeblock_group(events: &[(usize, Event)]) -> bool {
+    match events {
+        [(_, Event::Start(Tag::CodeBlock(_))), .., (_, Event::End(Tag::CodeBlock(_)))] => {
+            let (codeblock_text, _) = reconstruct_markdown(events, None);
+            // Heuristic to check whether the codeblock nether has a
+            // literal string nor a line comment.  We may actually
+            // want to use a lexer here to make this more robust.
+            !codeblock_text.contains("\"") && !codeblock_text.contains("//")
+        }
+        _ => false,
+    }
 }
 
 /// Render a slice of Markdown events back to Markdown.
@@ -860,14 +876,14 @@ The document[^1] text.
     #[test]
     fn extract_messages_code_block() {
         assert_extract_messages(
-            "Preamble\n```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
+            "Preamble\n```rust\n// Example:\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
             vec![
                 (1, "Preamble"),
                 (
                     2,
-                    "```rust\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```",
+                    "```rust\n// Example:\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```",
                 ),
-                (9, "Postamble"),
+                (10, "Postamble"),
             ],
         );
     }
@@ -876,15 +892,15 @@ The document[^1] text.
     fn extract_messages_two_code_blocks() {
         assert_extract_messages(
             "```\n\
-             First block\n\
+             \"First\" block\n\
              ```\n\
              ```\n\
-             Second block\n\
+             \"Second\" block\n\
              ```\n\
              ",
             vec![
-                (1, "```\nFirst block\n```"), //
-                (4, "```\nSecond block\n```"),
+                (1, "```\n\"First\" block\n```"), //
+                (4, "```\n\"Second\" block\n```"),
             ],
         );
     }
@@ -898,6 +914,7 @@ The document[^1] text.
             > fn hello() {\n\
             >     some_code()\n\
             >\n\
+            >     // FIXME: do something here!\n\
             >     todo!()\n\
             > }\n\
             > ```\n\
@@ -906,9 +923,9 @@ The document[^1] text.
                 (1, "Preamble"),
                 (
                     2,
-                    "```rust\nfn hello() {\n    some_code()\n\n    todo!()\n}\n```",
+                    "```rust\nfn hello() {\n    some_code()\n\n    // FIXME: do something here!\n    todo!()\n}\n```",
                 ),
-                (9, "Postamble"),
+                (10, "Postamble"),
             ],
         );
     }
@@ -1023,7 +1040,7 @@ The document[^1] text.
         // incorrectly combine CodeBlock and HTML.
         assert_extract_messages(
             r#"```bob
-BOB
+// BOB
 ```
 
 <details>
@@ -1033,7 +1050,7 @@ BOB
 </details>
 "#,
             vec![
-                (1, "```bob\nBOB\n```"), //
+                (1, "```bob\n// BOB\n```"), //
                 (7, "Blah blah"),
             ],
         );
@@ -1199,5 +1216,62 @@ still skipped
 not-skipped",
             vec![(1, "foo "), (4, "not-skipped")],
         );
+    }
+
+    #[test]
+    fn extract_messages_automatic_skipping_nontranslatable_codeblocks_simple() {
+        assert_extract_messages(
+            r#"
+```
+def g(x):
+  this_should_be_skipped_no_strings_or_comments()
+```
+"#,
+            vec![],
+        );
+    }
+
+    #[test]
+    fn extract_messages_automatic_skipping_nontranslatable_codeblocks() {
+        assert_extract_messages(
+            r#"
+```
+def f(x):
+  print("this should be translated")
+```
+
+
+```
+def g(x):
+  but_this_should_not()
+```
+"#,
+            vec![(
+                2,
+                "```\ndef f(x):\n  print(\"this should be translated\")\n```",
+            )],
+        );
+    }
+
+    #[test]
+    fn is_nontranslatable_codeblock_group_true() {
+        let events = extract_events(
+            r#"```
+f(x)
+```"#,
+            None,
+        );
+        assert!(is_nontranslatable_codeblock_group(&events));
+    }
+
+    #[test]
+    fn is_nontranslatable_codeblock_group_false() {
+        let events = extract_events(
+            r#"```
+f("hello world")
+```"#,
+            None,
+        );
+        assert!(is_nontranslatable_codeblock_group(&events) == false);
     }
 }

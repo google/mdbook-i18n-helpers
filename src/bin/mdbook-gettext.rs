@@ -205,10 +205,10 @@ mod tests {
     fn test_translate_code_block() {
         let catalog = create_catalog(&[(
             "```rust,editable\n\
-             fn foo() {\n\n    let x = 10;\n\n}\n\
+             fn foo() {\n\n    let x = \"hello\";\n\n}\n\
              ```",
             "```rust,editable\n\
-             fn FOO() {\n\n    let X = 10;\n\n}\n\
+             fn FOO() {\n\n    let X = \"guten tag\";\n\n}\n\
              ```",
         )]);
         assert_eq!(
@@ -217,7 +217,7 @@ mod tests {
                  \n\
                  \n\
                  ```rust,editable\n\
-                 fn foo() {\n\n    let x = 10;\n\n}\n\
+                 fn foo() {\n\n    let x = \"hello\";\n\n}\n\
                  ```\n\
                  \n\
                  Text after.\n",
@@ -226,7 +226,7 @@ mod tests {
             "Text before.\n\
              \n\
              ```rust,editable\n\
-             fn FOO() {\n\n    let X = 10;\n\n}\n\
+             fn FOO() {\n\n    let X = \"guten tag\";\n\n}\n\
              ```\n\
              \n\
              Text after.",

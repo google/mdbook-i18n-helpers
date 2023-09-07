@@ -490,11 +490,13 @@ mod tests {
     fn test_normalize_code_blocks() {
         let catalog = create_catalog(&[(
             "```rust,editable\n\
+             // Example\n\
              foo\n\
              \n\
              * bar\n\
              ```",
             "```rust,editable\n\
+             // Beispiel\n\
              FOO\n\
              \n\
              * BAR\n\
@@ -504,11 +506,13 @@ mod tests {
             catalog,
             &[exact(
                 "```rust,editable\n\
+                 // Example\n\
                  foo\n\
                  \n\
                  * bar\n\
                  ```",
                 "```rust,editable\n\
+                 // Beispiel\n\
                  FOO\n\
                  \n\
                  * BAR\n\
