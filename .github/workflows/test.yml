@@ -48,11 +48,15 @@ jobs:
           restore-keys: |
             fuzz-corpus
 
-      - name: Run fuzz test
-        run: cd i18n-helpers && cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
+      - name: Run group_events fuzzer and minimize corpus
+        run: |
+          cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
+          cargo fuzz cmin group_events
 
-      - name: Minimize fuzz corpus
-        run: cd i18n-helpers && cargo fuzz cmin group_events
+      - name: Run normalize fuzzer and minimize corpus
+        run: |
+          cargo fuzz run normalize -- -only_ascii=1 -max_total_time=30
+          cargo fuzz cmin normalize
 
   clippy:
     name: Clippy
