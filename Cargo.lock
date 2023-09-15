@@ -418,7 +418,6 @@ name = "mdbook-i18n-helpers"
 version = "0.2.3"
 dependencies = [
  "anyhow",
- "chrono",
  "mdbook",
  "polib",
  "pretty_assertions",
