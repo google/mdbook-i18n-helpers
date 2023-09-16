@@ -185,14 +185,14 @@ Please see the [`publish.yml`] workflow in the Comprehensive Rust 🦀 repositor
 ## Marking Sections to be Skipped for Translation
 
 A block can be marked to be skipped for translation by prepending a special HTML
-comment `<!--- mdbook-xgettext:skip -->` to it.
+comment `<!-- mdbook-xgettext:skip -->` to it.
 
 For example:
 
 ````markdown
 The following code block should not be translated.
 
-<!--- mdbook-xgettext:skip -->
+<!-- mdbook-xgettext:skip -->
 
 ```
 fn hello() {
@@ -204,7 +204,7 @@ Itemized list:
 
 - A should be translated.
 
-<!--- mdbook-xgettext:skip -->
+<!-- mdbook-xgettext:skip -->
 
 - B should be skipped.
 - C should be translated.

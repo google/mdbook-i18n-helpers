@@ -673,9 +673,9 @@ mod tests {
     #[test]
     fn extract_events_comments() {
         assert_eq!(
-            extract_events("<!--- mdbook-xgettext:skip -->\nHello", None),
+            extract_events("<!-- mdbook-xgettext:skip -->\nHello", None),
             vec![
-                (1, Html("<!--- mdbook-xgettext:skip -->\n".into())),
+                (1, Html("<!-- mdbook-xgettext:skip -->\n".into())),
                 (2, Start(Paragraph)),
                 (2, Text("Hello".into())),
                 (2, End(Paragraph)),
@@ -1100,7 +1100,7 @@ The document[^1] text.
     #[test]
     fn extract_messages_skip_simple() {
         assert_extract_messages(
-            r#"<!--- mdbook-xgettext:skip -->
+            r#"<!-- mdbook-xgettext:skip -->
 
 This is a paragraph."#,
             vec![],
@@ -1110,7 +1110,7 @@ This is a paragraph."#,
     #[test]
     fn extract_messages_skip_next_paragraph_ok() {
         assert_extract_messages(
-            r#"<!--- mdbook-xgettext:skip -->
+            r#"<!-- mdbook-xgettext:skip -->
 This is a paragraph.
 
 This should be translated.
@@ -1122,7 +1122,7 @@ This should be translated.
     #[test]
     fn extract_messages_skip_next_codeblock() {
         assert_extract_messages(
-            r#"<!--- mdbook-xgettext:skip -->
+            r#"<!-- mdbook-xgettext:skip -->
 ```
 def f(x): return x * x
 ```
@@ -1135,11 +1135,11 @@ This should be translated.
     #[test]
     fn extract_messages_skip_back_to_back() {
         assert_extract_messages(
-            r#"<!--- mdbook-xgettext:skip -->
+            r#"<!-- mdbook-xgettext:skip -->
 ```
 def f(x): return x * x
 ```
-<!--- mdbook-xgettext:skip -->
+<!-- mdbook-xgettext:skip -->
 This should not translated.
 
 But *this* should!
@@ -1152,7 +1152,7 @@ But *this* should!
     fn extract_messages_inline_skips() {
         assert_extract_messages(
             "
-this should be translated <!--- mdbook-xgettext:skip --> but not this.
+this should be translated <!-- mdbook-xgettext:skip --> but not this.
 ... nor this.
 
 But *this* should!",
@@ -1165,7 +1165,7 @@ But *this* should!",
         assert_extract_messages(
             "
 * A
-<!--- mdbook-xgettext:skip -->
+<!-- mdbook-xgettext:skip -->
 * B
 * C
 ",
@@ -1179,7 +1179,7 @@ But *this* should!",
             "
 * A
 
-<!--- mdbook-xgettext:skip -->
+<!-- mdbook-xgettext:skip -->
 * B
 
 * C
@@ -1201,7 +1201,7 @@ But *this* should!",
         assert_extract_messages(
             "
 * A
-* <!--- mdbook-xgettext:skip --> B
+* <!-- mdbook-xgettext:skip --> B
 * C
 ",
             vec![(2, "A")],
@@ -1211,7 +1211,7 @@ But *this* should!",
     #[test]
     fn extract_messages_inline_skip_to_end_of_block() {
         assert_extract_messages(
-            "foo <!--- mdbook-xgettext:skip --> **bold** bar
+            "foo <!-- mdbook-xgettext:skip --> **bold** bar
 still skipped
 
 not-skipped",
