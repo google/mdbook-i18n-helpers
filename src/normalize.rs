@@ -1,4 +1,4 @@
-//! Normalize the Markdown in a  a PO or POT file.
+//! Normalize the Markdown in a PO or POT file.
 //!
 //! This file contains main logic used by the binary `mdbook-i18n-normalize`.
 
