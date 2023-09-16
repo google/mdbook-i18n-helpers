@@ -29,6 +29,7 @@ use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 use regex::Regex;
 use std::sync::OnceLock;
 
+pub mod gettext;
 pub mod normalize;
 
 /// Like `mdbook::utils::new_cmark_parser`, but also passes a
