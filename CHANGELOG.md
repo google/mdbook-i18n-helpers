@@ -2,6 +2,12 @@
 
 This lists the most important changes between releases.
 
+## Version 0.2.3 (2023-09-19)
+
+- [#75]: Automatically ignore code blocks without string literals and line
+  comments.
+- [#69]: Add support for skipping the next translation group.
+
 ## Version 0.2.2 (2023-08-23)
 
 - [#59]: Resolve broken links using the original sources.
@@ -12,8 +18,8 @@ This lists the most important changes between releases.
 
 ## Version 0.2.0 (2023-08-15)
 
-> This is a breaking release. Please make sure to run `mdbook-i18n-normalize` on
-> your existing PO files!
+> This is a breaking release. Please make sure to
+> [run `mdbook-i18n-normalize` on your existing PO files](USAGE.md)!
 
 - [#49]: Link to other projects which use mdbook-i18n-helpers.
 - [#46]: Add `mdbook-i18n-normalize` to convert existing PO files.
@@ -24,6 +30,8 @@ This lists the most important changes between releases.
 
 First release as a stand-alone crate.
 
+[#75]: https://github.com/google/mdbook-i18n-helpers/pull/75
+[#69]: https://github.com/google/mdbook-i18n-helpers/pull/69
 [#59]: https://github.com/google/mdbook-i18n-helpers/pull/59
 [#56]: https://github.com/google/mdbook-i18n-helpers/pull/56
 [#49]: https://github.com/google/mdbook-i18n-helpers/pull/49
