@@ -8,12 +8,12 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
+arbitrary = { version = "1.3.1", features = ["derive"] }
 libfuzzer-sys = "0.4.0"
+mdbook = { version = "0.4.25", default-features = false }
+mdbook-i18n-helpers = { path = ".." }
 polib = "0.2.0"
 pretty_assertions = "1.3.0"
-
-[dependencies.mdbook-i18n-helpers]
-path = ".."
 
 # Prevent this from interfering with workspaces
 [workspace]
@@ -31,5 +31,11 @@ doc = false
 [[bin]]
 name = "normalize"
 path = "fuzz_targets/normalize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "gettext"
+path = "fuzz_targets/gettext.rs"
 test = false
 doc = false

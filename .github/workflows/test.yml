@@ -61,6 +61,12 @@ jobs:
           cargo fuzz run normalize -- -only_ascii=1 -max_total_time=30
           cargo fuzz cmin normalize
 
+      - name: Run gettext fuzzer and minimize corpus
+        run: |
+          cd i18n-helpers
+          cargo fuzz run gettext -- -only_ascii=1 -max_total_time=30
+          cargo fuzz cmin normalize
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
