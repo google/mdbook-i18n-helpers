@@ -341,7 +341,7 @@ fn is_nontranslatable_codeblock_group(events: &[(usize, Event)]) -> bool {
             // Heuristic to check whether the codeblock nether has a
             // literal string nor a line comment.  We may actually
             // want to use a lexer here to make this more robust.
-            !codeblock_text.contains("\"") && !codeblock_text.contains("//")
+            !codeblock_text.contains('"') && !codeblock_text.contains("//")
         }
         _ => false,
     }
@@ -1273,6 +1273,6 @@ f("hello world")
 ```"#,
             None,
         );
-        assert!(is_nontranslatable_codeblock_group(&events) == false);
+        assert!(!is_nontranslatable_codeblock_group(&events));
     }
 }
