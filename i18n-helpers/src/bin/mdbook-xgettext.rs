@@ -48,6 +48,8 @@ fn create_catalog(ctx: &RenderContext) -> anyhow::Result<Catalog> {
     if let Some(lang) = &ctx.config.book.language {
         metadata.language = String::from(lang);
     }
+    let now = chrono::Local::now();
+    metadata.pot_creation_date = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     metadata.mime_version = String::from("1.0");
     metadata.content_type = String::from("text/plain; charset=UTF-8");
     metadata.content_transfer_encoding = String::from("8bit");
@@ -149,6 +151,8 @@ mod tests {
 
         let catalog = create_catalog(&ctx).unwrap();
         assert_eq!(catalog.metadata.project_id_version, "");
+        assert!(!catalog.metadata.pot_creation_date.is_empty());
+        assert!(catalog.metadata.po_revision_date.is_empty());
         assert_eq!(catalog.metadata.language, "en");
         assert_eq!(catalog.metadata.mime_version, "1.0");
         assert_eq!(catalog.metadata.content_type, "text/plain; charset=UTF-8");
