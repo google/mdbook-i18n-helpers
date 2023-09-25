@@ -39,7 +39,6 @@ $ cargo install mdbook-i18n-helpers
 Please see [USAGE](./i18n-helpers/USAGE.md) for how to translate your
 [mdbook](https://github.com/rust-lang/mdBook/) project.
 
-
 ## Changelog
 
 Please see [CHANGELOG](CHANGELOG.md) for details on the changes in each release.
