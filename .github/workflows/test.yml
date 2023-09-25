@@ -49,10 +49,10 @@ jobs:
             fuzz-corpus
 
       - name: Run fuzz test
-        run: cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
+        run: cd i18n-helpers && cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
 
       - name: Minimize fuzz corpus
-        run: cargo fuzz cmin group_events
+        run: cd i18n-helpers && cargo fuzz cmin group_events
 
   clippy:
     name: Clippy
