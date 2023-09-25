@@ -13,7 +13,9 @@ infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
 
 ## Showcases
 
-- ### [mdbook-i18n-helpers](./i18n-helpers/README.md):
+### mdbook-i18n-helpers
+
+Please add your project below if it uses [mdbook-i18n-helpers](i18n-helpers/README.md) for translations:
   - [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
   - [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
   - [Ordinal Theory Handbook](https://docs.ordinals.com/)
