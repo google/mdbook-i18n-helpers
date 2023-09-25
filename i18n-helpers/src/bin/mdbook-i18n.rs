@@ -29,9 +29,10 @@ struct I18nConfiguration {
     translate_all_languages: bool,
     /// Whether to move the translations to the html directory, defaults to false.
     ///
-    /// By default, translations's HTML output will live in `book/i18n/<language>/html`. If this is set to true, they will be moved to `book/html/<language>`.
+    /// By default, translations' output will live in `book/i18n/<language>/<renderer>`.
+    /// For all renderers in this list, we will move individual translations to `book/<renderer>/<language>`.
     #[serde(default)]
-    move_translations_to_html_directory: bool,
+    move_translations_directories: Vec<String>,
 }
 
 fn main() {
@@ -68,12 +69,6 @@ fn main() {
     let output_directory = ctx.destination;
     let default_language = &i18n_config.default_language;
 
-    // Create html directory if it doesn't exist.
-    if i18n_config.move_translations_to_html_directory {
-        std::fs::create_dir_all(output_directory.parent().unwrap().join("html"))
-            .unwrap_or_else(|_| panic!("Failed to create html directory in output directory"));
-    }
-
     for language in i18n_config.languages.keys() {
         // Skip current language and default language.
         if Some(language) == ctx.config.book.language.as_ref() {
@@ -93,13 +88,15 @@ fn main() {
         mdbook
             .build()
             .unwrap_or_else(|_| panic!("Failed to build translation for language: {}", language));
-        if i18n_config.move_translations_to_html_directory {
+        for renderer in &i18n_config.move_translations_directories {
+            std::fs::create_dir_all(output_directory.parent().unwrap().join(renderer))
+                .unwrap_or_else(|_| panic!("Failed to create html directory in output directory"));
             std::fs::rename(
-                output_directory.join(language).join("html"),
+                output_directory.join(language).join(renderer),
                 output_directory
                     .parent()
                     .unwrap()
-                    .join("html")
+                    .join(renderer)
                     .join(language),
             )
             .unwrap_or_else(|_| {
