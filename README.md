@@ -1,4 +1,4 @@
-# Internationalization and Rendering extensions for [mdbook](https://github.com/rust-lang/mdBook/)
+# Internationalization and Rendering extensions for `mdbook`
 
 [![Visit crates.io](https://img.shields.io/crates/v/mdbook-i18n-helpers?style=flat-square)](https://crates.io/crates/mdbook-i18n-helpers)
 [![Build workflow](https://img.shields.io/github/actions/workflow/status/google/mdbook-i18n-helpers/test.yml?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/actions/workflows/test.yml?query=branch%3Amain)
@@ -28,7 +28,7 @@ Please add your project below if it uses
 
 ## Installation
 
-- ### [mdbook-i18n-helpers](./i18n-helpers/README.md):
+### `mdbook-i18n-helpers`
 
   Run
 
