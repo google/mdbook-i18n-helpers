@@ -8,7 +8,7 @@
 This repository contains the following crates that provide extensions and
 infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
 
-- [mdbook-i18n-helpers](./i18n-helpers/README.md) - Gettext Translation Support
+- [mdbook-i18n-helpers](./i18n-helpers/README.md): Gettext translation support
   for [mdbook](https://github.com/rust-lang/mdBook/)
 
 ## Showcases
