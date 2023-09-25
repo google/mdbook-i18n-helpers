@@ -10,18 +10,6 @@ The plugins here makes it easy to translate documentation written in
 Support for translations is a
 [long-stading feature request for `mdbook`](https://github.com/rust-lang/mdBook/issues/5).
 
-## Showcases
-
-Please add your project below if it uses this infrastructure for translations:
-
-- [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
-- [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
-- [Ordinal Theory Handbook](https://docs.ordinals.com/)
-- [Getting Started with SONiC](https://r12f.com/sonic-book/)
-- [Dojo: The Provable Game Engine](https://book.dojoengine.org/)
-- [ezlog documentation](https://s1rius.github.io/ezlog/)
-- [The Cairo Programming Language](https://book.cairo-lang.org/)
-
 ## Installation
 
 Run
