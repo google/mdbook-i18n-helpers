@@ -1,18 +1,22 @@
-# Gettext Translation Support for `mdbook`
+# Internationalization and Rendering extensions for `mdbook`
 
 [![Visit crates.io](https://img.shields.io/crates/v/mdbook-i18n-helpers?style=flat-square)](https://crates.io/crates/mdbook-i18n-helpers)
 [![Build workflow](https://img.shields.io/github/actions/workflow/status/google/mdbook-i18n-helpers/test.yml?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/actions/workflows/test.yml?query=branch%3Amain)
 [![GitHub contributors](https://img.shields.io/github/contributors/google/mdbook-i18n-helpers?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/graphs/contributors)
 [![GitHub stars](https://img.shields.io/github/stars/google/mdbook-i18n-helpers?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/stargazers)
 
-The plugins here makes it easy to translate documentation written in
-[`mdbook`](https://github.com/rust-lang/mdBook/) into multiple languages.
-Support for translations is a
-[long-stading feature request for `mdbook`](https://github.com/rust-lang/mdBook/issues/5).
+This repository contains the following crates that provide extensions and
+infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
+
+- [mdbook-i18n-helpers](./i18n-helpers/README.md): Gettext translation support
+  for [mdbook](https://github.com/rust-lang/mdBook/)
 
 ## Showcases
 
-Please add your project below if it uses this infrastructure for translations:
+### mdbook-i18n-helpers
+
+Please add your project below if it uses
+[mdbook-i18n-helpers](i18n-helpers/README.md) for translations:
 
 - [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
 - [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
@@ -24,13 +28,16 @@ Please add your project below if it uses this infrastructure for translations:
 
 ## Installation
 
+### `mdbook-i18n-helpers`
+
 Run
 
 ```shell
 $ cargo install mdbook-i18n-helpers
 ```
 
-Please see [USAGE](USAGE.md) for how to translate your `mdbook` project.
+Please see [USAGE](./i18n-helpers/USAGE.md) for how to translate your
+[mdbook](https://github.com/rust-lang/mdBook/) project.
 
 ## Changelog
 
