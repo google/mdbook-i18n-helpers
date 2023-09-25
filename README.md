@@ -39,7 +39,6 @@ Please add your project below if it uses
   Please see [USAGE](./i18n-helpers/USAGE.md) for how to translate your
   [mdbook](https://github.com/rust-lang/mdBook/) project.
 
----
 
 ## Changelog
 
