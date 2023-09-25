@@ -1,10 +1,15 @@
-# Internationalization and Rendering extensions for `mdbook`
+# Internationalization and Rendering extensions for [mdbook](https://github.com/rust-lang/mdBook/)
+
+[![Visit crates.io](https://img.shields.io/crates/v/mdbook-i18n-helpers?style=flat-square)](https://crates.io/crates/mdbook-i18n-helpers)
+[![Build workflow](https://img.shields.io/github/actions/workflow/status/google/mdbook-i18n-helpers/test.yml?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/actions/workflows/test.yml?query=branch%3Amain)
+[![GitHub contributors](https://img.shields.io/github/contributors/google/mdbook-i18n-helpers?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/graphs/contributors)
+[![GitHub stars](https://img.shields.io/github/stars/google/mdbook-i18n-helpers?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/stargazers)
 
 This repository contains the following crates that provide extensions and
-infrastructure for `mdbook`:
+infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
 
 - [mdbook-i18n-helpers](./i18n-helpers/README.md) - Gettext Translation Support
-  for `mdbook`
+  for [mdbook](https://github.com/rust-lang/mdBook/)
 
 ## Showcases
 
@@ -27,8 +32,8 @@ infrastructure for `mdbook`:
   $ cargo install mdbook-i18n-helpers
   ```
 
-  Please see [USAGE](./i18n-helpers/USAGE.md) for how to translate your `mdbook`
-  project.
+  Please see [USAGE](./i18n-helpers/USAGE.md) for how to translate your
+  [mdbook](https://github.com/rust-lang/mdBook/) project.
 
 ---
 
