@@ -1,10 +1,10 @@
 # Internationalization and Rendering extensions for `mdbook`
 
-This repository contains the following crates that provide extensions
-and infrastructure for `mdbook`:
+This repository contains the following crates that provide extensions and
+infrastructure for `mdbook`:
 
 - [mdbook-i18n-helpers](./i18n-helpers/README.md) - Gettext Translation Support
-for `mdbook`
+  for `mdbook`
 
 ## Showcases
 
@@ -34,8 +34,7 @@ for `mdbook`
 
 ## Changelog
 
-Please see [CHANGELOG](CHANGELOG.md) for details on the changes in each
-release.
+Please see [CHANGELOG](CHANGELOG.md) for details on the changes in each release.
 
 ## Contact
 
