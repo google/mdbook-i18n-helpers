@@ -34,7 +34,8 @@ Please see [USAGE](USAGE.md) for how to translate your `mdbook` project.
 
 ## Changelog
 
-Please see [CHANGELOG](../CHANGELOG.md) for details on the changes in each release.
+Please see [CHANGELOG](../CHANGELOG.md) for details on the changes in each
+release.
 
 ## Contact
 
