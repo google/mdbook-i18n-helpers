@@ -15,14 +15,16 @@ infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
 
 ### mdbook-i18n-helpers
 
-Please add your project below if it uses [mdbook-i18n-helpers](i18n-helpers/README.md) for translations:
-  - [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
-  - [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
-  - [Ordinal Theory Handbook](https://docs.ordinals.com/)
-  - [Getting Started with SONiC](https://r12f.com/sonic-book/)
-  - [Dojo: The Provable Game Engine](https://book.dojoengine.org/)
-  - [ezlog documentation](https://s1rius.github.io/ezlog/)
-  - [The Cairo Programming Language](https://book.cairo-lang.org/)
+Please add your project below if it uses
+[mdbook-i18n-helpers](i18n-helpers/README.md) for translations:
+
+- [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/)
+- [Game Boy Assembly Tutorial](https://gbdev.io/gb-asm-tutorial/)
+- [Ordinal Theory Handbook](https://docs.ordinals.com/)
+- [Getting Started with SONiC](https://r12f.com/sonic-book/)
+- [Dojo: The Provable Game Engine](https://book.dojoengine.org/)
+- [ezlog documentation](https://s1rius.github.io/ezlog/)
+- [The Cairo Programming Language](https://book.cairo-lang.org/)
 
 ## Installation
 
