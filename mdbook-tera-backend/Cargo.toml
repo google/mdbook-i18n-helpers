@@ -1,0 +1,22 @@
+[package]
+name = "mdbook-tera-backend"
+version = "0.0.1"
+authors = ["Martin Geisler <mgeisler@google.com>"]
+categories = ["template-engine"]
+edition = "2021"
+keywords = ["mdbook", "tera", "renderer", "template"]
+license = "Apache-2.0"
+repository = "https://github.com/google/mdbook-i18n-helpers"
+description = "Plugins for a mdbook translation workflow based on Gettext."
+
+[dependencies]
+chrono = { version = "0.4.31", default-features = false, features = ["alloc"] }
+lol_html = "1.2.0"
+mdbook = { version = "0.4.25", default-features = false }
+serde = "1.0"
+serde_json = "1.0.91"
+tera = "1.19.1"
+thiserror = "1.0.48"
+
+[dev-dependencies]
+tempfile = "3.5.0"
