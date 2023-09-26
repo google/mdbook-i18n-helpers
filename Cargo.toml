@@ -1,3 +1,4 @@
 [workspace]
 members = ["i18n-helpers"]
 default-members = ["i18n-helpers"]
+resolver = "2"
