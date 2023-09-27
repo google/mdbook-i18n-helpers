@@ -2,6 +2,10 @@
 
 This lists the most important changes between releases.
 
+## Version 0.2.4 (2023-09-27)
+
+- [#87]: Set the POT-Creation-Date field in newly generated POT files.
+
 ## Version 0.2.3 (2023-09-19)
 
 - [#75]: Automatically ignore code blocks without string literals and line
@@ -30,6 +34,7 @@ This lists the most important changes between releases.
 
 First release as a stand-alone crate.
 
+[#87]: https://github.com/google/mdbook-i18n-helpers/pull/87
 [#75]: https://github.com/google/mdbook-i18n-helpers/pull/75
 [#69]: https://github.com/google/mdbook-i18n-helpers/pull/69
 [#59]: https://github.com/google/mdbook-i18n-helpers/pull/59
