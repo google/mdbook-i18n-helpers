@@ -24,6 +24,7 @@
 //! how to use the supplied `mdbook` plugins.
 
 use polib::catalog::Catalog;
+use polib::message::Message;
 use pulldown_cmark::{Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 use regex::Regex;
@@ -474,6 +475,20 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
     }
 
     messages
+}
+
+/// Builds messages and populates Catalog with translatable text extracted from Markdown file
+///
+pub fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
+    let sources = match catalog.find_message(None, msgid, None) {
+        Some(msg) => format!("{}\n{}", msg.source(), source),
+        None => String::from(source),
+    };
+    let message = Message::build_singular()
+        .with_source(sources)
+        .with_msgid(String::from(msgid))
+        .done();
+    catalog.append_or_update(message);
 }
 
 /// Trim `new_events` if they're wrapped in an unwanted paragraph.

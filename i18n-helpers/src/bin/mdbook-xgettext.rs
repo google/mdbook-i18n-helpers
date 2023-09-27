@@ -22,23 +22,10 @@
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
-use mdbook_i18n_helpers::extract_messages;
+use mdbook_i18n_helpers::{add_message, extract_messages};
 use polib::catalog::Catalog;
-use polib::message::Message;
 use polib::metadata::CatalogMetadata;
 use std::{fs, io};
-
-fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
-    let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => format!("{}\n{}", msg.source(), source),
-        None => String::from(source),
-    };
-    let message = Message::build_singular()
-        .with_source(sources)
-        .with_msgid(String::from(msgid))
-        .done();
-    catalog.append_or_update(message);
-}
 
 fn create_catalog(ctx: &RenderContext) -> anyhow::Result<Catalog> {
     let mut metadata = CatalogMetadata::new();
@@ -131,8 +118,7 @@ mod tests {
         files: &[(&str, &str)],
     ) -> anyhow::Result<(RenderContext, tempfile::TempDir)> {
         let tmpdir = tempfile::tempdir().context("Could not create temporary directory")?;
-        std::fs::create_dir(tmpdir.path().join("src"))
-            .context("Could not create src/ directory")?;
+        fs::create_dir(tmpdir.path().join("src")).context("Could not create src/ directory")?;
 
         for (path, contents) in files {
             std::fs::write(tmpdir.path().join(path), contents)
