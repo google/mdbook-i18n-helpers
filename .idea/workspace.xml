@@ -8,12 +8,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a95b1a24-0811-431c-9b01-5b65c848e7e3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/ktfmt.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/i18n-helpers/src/bin/markdown-xgettext.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/i18n-helpers/src/bin/mdbook-xgettext.rs" beforeDir="false" afterPath="$PROJECT_DIR$/i18n-helpers/src/bin/mdbook-xgettext.rs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/i18n-helpers/src/lib.rs" beforeDir="false" afterPath="$PROJECT_DIR$/i18n-helpers/src/lib.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/i18n-helpers/src/bin/markdown-xgettext.rs" beforeDir="false" afterPath="$PROJECT_DIR$/i18n-helpers/src/bin/markdown-xgettext.rs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -94,7 +90,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1695830001651</updated>
-      <workItem from="1695830002682" duration="13891000" />
+      <workItem from="1695830002682" duration="15168000" />
     </task>
     <servers />
   </component>

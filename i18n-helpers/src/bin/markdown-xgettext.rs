@@ -20,7 +20,6 @@ fn create_catalog(content: &str, source_path: &str, language: &str) -> anyhow::R
 
     for (lineno, msgid) in extract_messages(content) {
         let source = format!("{}:{}", source_path, lineno);
-        println!("msgid: {}", &msgid);
         add_message(&mut catalog, &msgid, &source);
     }
 
@@ -59,8 +58,6 @@ fn main() -> anyhow::Result<()> {
     } else {
         fs::read_to_string(input)?
     };
-
-    println!("This is where content is {}", &content);
 
     let catalog = create_catalog(&content, input, language)?;
 
