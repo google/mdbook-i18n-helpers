@@ -125,7 +125,7 @@ mod tests {
             assert!(!msg.is_translated());
         }
 
-        assert_eq!(catalog.metadata.language, "er");
+        assert_eq!(catalog.metadata.language, "en");
 
         assert_eq!(
             catalog
