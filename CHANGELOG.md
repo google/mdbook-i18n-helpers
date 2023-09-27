@@ -2,6 +2,10 @@
 
 This lists the most important changes between releases.
 
+## Version 0.2.4 (2023-09-27)
+
+- [#87]: Set the POT-Creation-Date field in newly generated POT files.
+
 ## Version 0.2.3 (2023-09-19)
 
 - [#75]: Automatically ignore code blocks without string literals and line
@@ -19,7 +23,7 @@ This lists the most important changes between releases.
 ## Version 0.2.0 (2023-08-15)
 
 > This is a breaking release. Please make sure to
-> [run `mdbook-i18n-normalize` on your existing PO files](USAGE.md)!
+> [run `mdbook-i18n-normalize` on your existing PO files](i18n-helpers/USAGE.md)!
 
 - [#49]: Link to other projects which use mdbook-i18n-helpers.
 - [#46]: Add `mdbook-i18n-normalize` to convert existing PO files.
@@ -30,6 +34,7 @@ This lists the most important changes between releases.
 
 First release as a stand-alone crate.
 
+[#87]: https://github.com/google/mdbook-i18n-helpers/pull/87
 [#75]: https://github.com/google/mdbook-i18n-helpers/pull/75
 [#69]: https://github.com/google/mdbook-i18n-helpers/pull/69
 [#59]: https://github.com/google/mdbook-i18n-helpers/pull/59
