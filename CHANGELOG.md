@@ -23,7 +23,7 @@ This lists the most important changes between releases.
 ## Version 0.2.0 (2023-08-15)
 
 > This is a breaking release. Please make sure to
-> [run `mdbook-i18n-normalize` on your existing PO files](USAGE.md)!
+> [run `mdbook-i18n-normalize` on your existing PO files](i18n-helpers/USAGE.md)!
 
 - [#49]: Link to other projects which use mdbook-i18n-helpers.
 - [#46]: Add `mdbook-i18n-normalize` to convert existing PO files.
