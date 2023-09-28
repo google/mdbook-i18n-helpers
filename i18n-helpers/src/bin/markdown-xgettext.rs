@@ -31,8 +31,8 @@ fn main() -> anyhow::Result<()> {
     let mut language = "en";
 
     for i in 0..args.len() {
-        if args[i].starts_with("-lang") {
-            if args[i] == "-lang" && i + 1 < args.len() {
+        if args[i].starts_with("--lang") {
+            if args[i] == "--lang" && i + 1 < args.len() {
                 language = &args[i + 1];
             } else {
                 let split: Vec<&str> = args[i].split('=').collect();
@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     let (input, output) = match args.as_slice() {
         [_, input, output, ..] => (input, output),
         [prog_name, ..] => bail!(
-            "Usage: {prog_name} <input.md> <output.po> [-lang=<language> OR -lang <language>]"
+            "Usage: {prog_name} <input.md> <output.po> [--lang=<language> OR --lang <language>]"
         ),
         [] => unreachable!(),
     };

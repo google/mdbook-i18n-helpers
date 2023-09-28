@@ -28,18 +28,11 @@ use anyhow::{anyhow, Context};
 use mdbook::book::Book;
 use mdbook::preprocess::{CmdPreprocessor, PreprocessorContext};
 use mdbook::BookItem;
-use mdbook_i18n_helpers::{extract_events, reconstruct_markdown, translate_events};
+use mdbook_i18n_helpers::translate;
 use polib::catalog::Catalog;
 use polib::po_file;
 use semver::{Version, VersionReq};
 use std::{io, process};
-
-fn translate(text: &str, catalog: &Catalog) -> String {
-    let events = extract_events(text, None);
-    let translated_events = translate_events(&events, catalog);
-    let (translated, _) = reconstruct_markdown(&translated_events, None);
-    translated
-}
 
 fn translate_book(ctx: &PreprocessorContext, mut book: Book) -> anyhow::Result<Book> {
     // Translation is a no-op when the target language is not set

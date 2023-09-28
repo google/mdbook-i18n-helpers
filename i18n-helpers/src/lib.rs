@@ -534,6 +534,13 @@ pub fn trim_paragraph<'a, 'event>(
     }
 }
 
+pub fn translate(text: &str, catalog: &Catalog) -> String {
+    let events = extract_events(text, None);
+    let translated_events = translate_events(&events, catalog);
+    let (translated, _) = reconstruct_markdown(&translated_events, None);
+    translated
+}
+
 /// Translate `events` using `catalog`.
 pub fn translate_events<'a>(
     events: &'a [(usize, Event<'a>)],
