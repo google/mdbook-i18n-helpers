@@ -74,10 +74,8 @@ fn main() {
         if Some(language) == ctx.config.book.language.as_ref() {
             continue;
         }
-        if let Some(default_language) = default_language {
-            if default_language == language {
-                continue;
-            }
+        if default_language == Some(language) {
+            continue;
         }
         let translation_path = output_directory.join(language);
 
