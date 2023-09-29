@@ -51,15 +51,12 @@ fn translate_files(
 
         let translated_content = translate(&contents, &catalog);
 
-        // Prepare output file path
         let output_file_name = file_path.file_name().ok_or(anyhow!("Invalid file name"))?;
         let output_file_path = output_path.join(output_file_name);
 
-        // Create and open the output file
         let mut output_file = File::create(&output_file_path)
             .with_context(|| format!("Failed to create file: {}", output_file_path.display()))?;
 
-        // Write the translated content to the output file
         output_file
             .write_all(translated_content.as_bytes())
             .with_context(|| format!("Failed to write to file: {}", output_file_path.display()))?;
@@ -170,23 +167,25 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_split_argument() {
-        assert_eq!(split_argument(&"--po=lang.po".to_string()), Some("lang.po".to_string()));
+        assert_eq!(
+            split_argument(&"--po=lang.po".to_string()),
+            Some("lang.po".to_string())
+        );
         assert_eq!(split_argument(&"--out src/resources".to_string()), None);
         assert_eq!(split_argument(&"--invalid".to_string()), None);
     }
 
     #[test]
-    fn test_validate_file() -> anyhow::Result<()>{
+    fn test_validate_file() -> anyhow::Result<()> {
         let tmp_dir = tempfile::tempdir()?;
-        let md_path= tmp_dir.path().join("test.md");
-        let html_path= tmp_dir.path().join("test.html");
+        let md_path = tmp_dir.path().join("test.md");
+        let html_path = tmp_dir.path().join("test.html");
         let source_path = md_path.to_str().unwrap();
 
         let markdown_content = "# How to Foo from a specified file path\n\
@@ -196,7 +195,7 @@ mod tests {
 
         let html_content = "<h1>Hello Foo! </h1>";
 
-        let mut md_file= File::create(&md_path)?;
+        let mut md_file = File::create(&md_path)?;
         let mut html_file = File::create(&html_path)?;
         write!(md_file, "{}", markdown_content)?;
         write!(html_file, "{}", html_content)?;
@@ -209,8 +208,6 @@ mod tests {
         Ok(())
     }
 
-
-    // Unhappy path tests
     #[test]
     fn test_build_catalog_none() {
         let result = build_catalog(None);

@@ -4,8 +4,17 @@ use polib::catalog::Catalog;
 use polib::metadata::CatalogMetadata;
 use polib::po_file;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{env, fs, io};
+
+fn split_argument(arg: &String) -> Option<String> {
+    let splitted: Vec<_> = arg.split('=').collect();
+    if splitted.len() == 2 {
+        return Some(splitted[1].to_string());
+    }
+
+    None
+}
 
 fn create_catalog(content: &str, source_path: &str, language: &str) -> anyhow::Result<Catalog> {
     let mut metadata = CatalogMetadata::new();
@@ -28,26 +37,25 @@ fn create_catalog(content: &str, source_path: &str, language: &str) -> anyhow::R
 
 fn main() -> anyhow::Result<()> {
     let args = env::args().collect::<Vec<_>>();
-    let mut language = "en";
+    let mut language = String::from("en");
+    let mut output_dir: Option<String> = None;
 
-    for i in 0..args.len() {
-        if args[i].starts_with("--lang") {
-            if args[i] == "--lang" && i + 1 < args.len() {
-                language = &args[i + 1];
-            } else {
-                let split: Vec<&str> = args[i].split('=').collect();
-                if split.len() == 2 {
-                    language = split[1];
-                }
+    let mut iter = args.iter().peekable();
+    while let Some(arg) = iter.next() {
+        if arg.starts_with("--lang") {
+            if let Some(lang) = split_argument(arg) {
+                language = lang;
             }
+        } else if arg.starts_with("--out") {
+            output_dir = split_argument(arg);
         }
     }
 
     let (input, output) = match args.as_slice() {
         [_, input, output, ..] => (input, output),
-        [prog_name, ..] => bail!(
-            "Usage: {prog_name} <input.md> <output.po> [--lang=<language> OR --lang <language>]"
-        ),
+        [prog_name, ..] => {
+            bail!("Usage: {prog_name} <input.md> <output.po> --lang=<language> --out=<dir>")
+        }
         [] => unreachable!(),
     };
 
@@ -59,10 +67,22 @@ fn main() -> anyhow::Result<()> {
         fs::read_to_string(input)?
     };
 
-    let catalog = create_catalog(&content, input, language)?;
+    let catalog = create_catalog(&content, input, &language)?;
 
-    po_file::write(&catalog, Path::new(output))
-        .context(format!("Writing messages to {}", output))?;
+    let mut output_path = PathBuf::new();
+    if let Some(out_dir) = &output_dir {
+        let out_dir_path = Path::new(out_dir);
+
+        if !out_dir_path.is_dir() {
+            bail!("The specified output path is not a directory.");
+        }
+
+        output_path.push(out_dir_path);
+    }
+    output_path.push(output);
+
+    po_file::write(&catalog, output_path.as_path())
+        .context(format!("Writing messages to {}", output_path.display()))?;
 
     Ok(())
 }

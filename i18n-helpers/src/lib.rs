@@ -534,6 +534,8 @@ pub fn trim_paragraph<'a, 'event>(
     }
 }
 
+/// Extracts Markdown events from given text, then translates using specified Catalog,
+/// and reconstructs Markdown file with new translated text
 pub fn translate(text: &str, catalog: &Catalog) -> String {
     let events = extract_events(text, None);
     let translated_events = translate_events(&events, catalog);
