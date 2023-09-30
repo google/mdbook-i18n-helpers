@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Context};
+use anyhow::{bail, Context};
 use clap::{Arg, Command};
 use mdbook_i18n_helpers::{add_message, extract_messages};
 use polib::catalog::Catalog;
@@ -97,7 +97,6 @@ fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::TempDir;
     static MARKDOWN_CONTENT: &str = "# How to Foo from wef\n\
                                       \n\
@@ -134,6 +133,7 @@ mod tests {
         let result = ingest_input(Some(bogus_file_path.to_str().unwrap()));
         assert!(result.is_err());
 
+        tmp_dir.close()?;
         Ok(())
     }
 
@@ -203,7 +203,6 @@ mod tests {
         assert_eq!(result, expected);
 
         tmp_dir.close()?;
-
         Ok(())
     }
 

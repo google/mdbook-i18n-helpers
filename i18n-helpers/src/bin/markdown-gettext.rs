@@ -75,7 +75,7 @@ fn allocate_files(
     Ok(valid_files)
 }
 
-fn find_output_path(output_path_option: Option<&str>) -> anyhow::Result<PathBuf> {
+fn build_output_path(output_path_option: Option<&str>) -> anyhow::Result<PathBuf> {
     let output_path = output_path_option.unwrap_or("translated_md_files");
     let path = PathBuf::from(output_path);
     fs::create_dir_all(&path)
@@ -105,7 +105,7 @@ fn main() -> anyhow::Result<()> {
 
     let files = allocate_files(dir_option, file_option)?;
     let catalog = build_catalog(lang)?;
-    let output_path = find_output_path(output_path_option)?;
+    let output_path = build_output_path(output_path_option)?;
 
     translate_files(catalog, files, output_path)?;
 
@@ -161,10 +161,12 @@ mod tests {
 
     #[test]
     fn test_allocate_files_invalid_file() -> anyhow::Result<()> {
-        let (_, invalid_file) = create_temp_directory(INVALID_CONTENT, "wef.html")?;
+        let (tmp_dir, invalid_file) = create_temp_directory(INVALID_CONTENT, "wef.html")?;
         let result = allocate_files(None, Some(invalid_file.to_str().unwrap()));
 
         assert!(result.is_err());
+
+        tmp_dir.close()?;
 
         Ok(())
     }
@@ -195,7 +197,7 @@ mod tests {
         let file_path = tmp_dir.path().join("wef.txt");
         File::create(&file_path)?;
 
-        let result = find_output_path(Some(&file_path.to_str().unwrap().to_string()));
+        let result = build_output_path(Some(&file_path.to_str().unwrap().to_string()));
         assert!(result.is_err());
 
         tmp_dir.close()?;
@@ -205,8 +207,8 @@ mod tests {
 
     #[test]
     fn test_find_output_path_default() -> anyhow::Result<()> {
-        let default_output_path = find_output_path(None)?;
-        let dir_output_path = find_output_path(Some("wef_dir"))?;
+        let default_output_path = build_output_path(None)?;
+        let dir_output_path = build_output_path(Some("wef_dir"))?;
 
         assert_eq!(default_output_path, PathBuf::from("translated_md_files"));
         assert_eq!(dir_output_path, PathBuf::from("wef_dir"));
@@ -221,7 +223,7 @@ mod tests {
     #[test]
     fn test_find_output_path_given_existing_dir() -> anyhow::Result<()> {
         let tmp_dir = tempfile::tempdir()?;
-        let output_path = find_output_path(Some(tmp_dir.path().to_str().unwrap()))?;
+        let output_path = build_output_path(Some(tmp_dir.path().to_str().unwrap()))?;
         assert_eq!(output_path, tmp_dir.path());
         assert!(output_path.is_dir());
 
@@ -236,8 +238,8 @@ mod tests {
         let tmp_file = tmp_dir.path().join("temp.md");
         File::create(&tmp_file)?;
 
-        let file_result = find_output_path(Some(tmp_file.to_str().unwrap()));
-        let rogue_result = find_output_path(Some("\0"));
+        let file_result = build_output_path(Some(tmp_file.to_str().unwrap()));
+        let rogue_result = build_output_path(Some("\0"));
 
         assert!(file_result.is_err() && rogue_result.is_err());
 
