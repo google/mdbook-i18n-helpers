@@ -24,6 +24,7 @@
 //! how to use the supplied `mdbook` plugins.
 
 use polib::catalog::Catalog;
+use polib::message::Message;
 use pulldown_cmark::{Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
 use regex::Regex;
@@ -476,6 +477,20 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
     messages
 }
 
+/// Builds messages and populates Catalog with translatable text extracted from Markdown file
+///
+pub fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
+    let sources = match catalog.find_message(None, msgid, None) {
+        Some(msg) => format!("{}\n{}", msg.source(), source),
+        None => String::from(source),
+    };
+    let message = Message::build_singular()
+        .with_source(sources)
+        .with_msgid(String::from(msgid))
+        .done();
+    catalog.append_or_update(message);
+}
+
 /// Trim `new_events` if they're wrapped in an unwanted paragraph.
 ///
 /// If `new_events` is wrapped in a paragraph and `old_events` isn't,
@@ -517,6 +532,15 @@ pub fn trim_paragraph<'a, 'event>(
         },
         [..] => new_events,
     }
+}
+
+/// Extracts Markdown events from given text, then translates using specified Catalog,
+/// and reconstructs Markdown file with new translated text
+pub fn translate(text: &str, catalog: &Catalog) -> String {
+    let events = extract_events(text, None);
+    let translated_events = translate_events(&events, catalog);
+    let (translated, _) = reconstruct_markdown(&translated_events, None);
+    translated
 }
 
 /// Translate `events` using `catalog`.
