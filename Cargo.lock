@@ -419,6 +419,7 @@ version = "0.2.3"
 dependencies = [
  "anyhow",
  "chrono",
+ "clap",
  "mdbook",
  "polib",
  "pretty_assertions",

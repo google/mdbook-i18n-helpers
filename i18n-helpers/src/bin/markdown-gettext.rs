@@ -1,38 +1,20 @@
 use anyhow::{anyhow, bail, Context};
+use clap::{Arg, ArgGroup, Command};
 use mdbook_i18n_helpers::translate;
 use polib::catalog::Catalog;
 use polib::po_file;
+use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
-use std::path::PathBuf;
-use std::{env, fs};
+use std::path::{Path, PathBuf};
 
-fn split_argument(arg: &String) -> Option<String> {
-    let splitted: Vec<_> = arg.split('=').collect();
-    if splitted.len() == 2 {
-        return Some(splitted[1].to_string());
-    }
+fn build_catalog(lang: &str) -> anyhow::Result<Catalog> {
+    let pot_path = Path::new(lang);
+    let catalog = po_file::parse(pot_path)
+        .map_err(|err| anyhow!("{err}"))
+        .with_context(|| format!("Could not parse {:?} as PO file", pot_path))?;
 
-    None
-}
-
-fn build_catalog(lang_option: Option<String>) -> anyhow::Result<Catalog> {
-    match lang_option {
-        Some(lang_path) => {
-            let pot_path = PathBuf::from(&lang_path);
-
-            if pot_path.exists() {
-                let catalog = po_file::parse(&pot_path)
-                    .map_err(|err| anyhow!("{err}"))
-                    .with_context(|| format!("Could not parse {:?} as PO file", pot_path))?;
-
-                return Ok(catalog);
-            }
-
-            bail!("--po must be specified")
-        }
-        None => bail!("--po must be specified"),
-    }
+    Ok(catalog)
 }
 
 fn translate_files(
@@ -41,7 +23,7 @@ fn translate_files(
     output_path: PathBuf,
 ) -> anyhow::Result<()> {
     for file_path in files.iter() {
-        let content = File::open(&file_path)
+        let content = File::open(file_path)
             .with_context(|| format!("Failed to open file: {}", file_path.display()))?;
         let mut buf_reader = BufReader::new(content);
         let mut contents = String::new();
@@ -61,40 +43,28 @@ fn translate_files(
             .write_all(translated_content.as_bytes())
             .with_context(|| format!("Failed to write to file: {}", output_file_path.display()))?;
     }
-
     Ok(())
 }
 
-fn validate_file(path: &PathBuf) -> bool {
+fn validate_file(path: &Path) -> bool {
     path.is_file() && path.extension().map_or(false, |ext| ext == "md")
 }
 
 fn allocate_files(
-    dir_option: Option<String>,
-    file_option: Option<String>,
+    dir_option: Option<&str>,
+    file_option: Option<&str>,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let mut valid_files = Vec::new();
-
     match (dir_option, file_option) {
-        (Some(_), Some(_)) => return bail!("Only one of --dir or --f should be specified"),
-        (None, None) => return bail!("Either --dir or --f must be specified"),
         (Some(dir_path), None) => {
-            let full_dir = PathBuf::from(&dir_path);
-            if !full_dir.exists() || !full_dir.is_dir() {
-                return bail!("Directory does not exist: {}", full_dir.display());
-            }
-
-            for entry in fs::read_dir(full_dir)? {
-                let entry = entry?;
-                let path = entry.path();
-
-                if validate_file(&path) {
-                    valid_files.push(path);
-                }
-            }
+            let full_dir = PathBuf::from(dir_path);
+            fs::read_dir(full_dir)?
+                .filter_map(Result::ok)
+                .filter(|entry| validate_file(&entry.path()))
+                .for_each(|entry| valid_files.push(entry.path()));
         }
         (None, Some(file_path)) => {
-            let full_file_path = PathBuf::from(&file_path);
+            let full_file_path = PathBuf::from(file_path);
             if !validate_file(&full_file_path) {
                 bail!("Markdown file does not exist: {}", full_file_path.display())
             }
@@ -102,64 +72,39 @@ fn allocate_files(
         }
         _ => unreachable!(),
     }
-
     Ok(valid_files)
 }
 
-fn find_output_path(output_path_option: Option<String>) -> anyhow::Result<PathBuf> {
-    match output_path_option {
-        Some(output_path) => {
-            let path = PathBuf::from(&output_path);
-            if path.exists() {
-                if !path.is_dir() {
-                    bail!(
-                        "Specified output path exists but is not a directory: {}",
-                        path.display()
-                    );
-                }
-            } else {
-                fs::create_dir_all(&path)
-                    .with_context(|| format!("Failed to create directory: {}", path.display()))?;
-            }
-            Ok(path)
-        }
-        None => {
-            let default_path = PathBuf::from("translated_md_files");
-            fs::create_dir_all(&default_path).with_context(|| {
-                format!(
-                    "Failed to create default directory: {}",
-                    default_path.display()
-                )
-            })?;
-            Ok(default_path)
-        }
-    }
+fn find_output_path(output_path_option: Option<&str>) -> anyhow::Result<PathBuf> {
+    let output_path = output_path_option.unwrap_or("translated_md_files");
+    let path = PathBuf::from(output_path);
+    fs::create_dir_all(&path)
+        .with_context(|| format!("Failed to create directory: {}", path.display()))?;
+    Ok(path)
 }
 
 fn main() -> anyhow::Result<()> {
-    let args = env::args().collect::<Vec<_>>();
+    let matches = Command::new("markdown-gettext")
+        .about("markdown translator binary for mdbook-i18n-helpers")
+        .arg(Arg::new("input_dir").short('d').long("dir"))
+        .arg(Arg::new("file").short('f').long("file"))
+        .arg(Arg::new("po").short('p').long("po").required(true))
+        .arg(Arg::new("output_dir").short('o').long("out"))
+        .group(
+            ArgGroup::new("input_source")
+                .args(["input_dir", "file"])
+                .required(true)
+                .multiple(false),
+        )
+        .get_matches();
 
-    let mut lang_option: Option<String> = None;
-    let mut dir_option: Option<String> = None;
-    let mut file_option: Option<String> = None;
-    let mut output_path_option: Option<String> = None;
-
-    let mut iter = args.iter().peekable();
-
-    while let Some(arg) = iter.next() {
-        if arg.starts_with("--po") {
-            lang_option = split_argument(arg)
-        } else if arg.starts_with("--dir") {
-            dir_option = split_argument(arg)
-        } else if arg.starts_with("--f") {
-            file_option = split_argument(arg)
-        } else if arg.starts_with("--out") {
-            output_path_option = split_argument(arg)
-        }
-    }
+    let lang = matches.get_one::<String>("po").unwrap().as_str();
+    let dir_option = matches.get_one::<String>("input_dir").map(|d| d.as_str());
+    let file_option = matches.get_one::<String>("file").map(|f| f.as_str());
+    let output_path_option = matches.get_one::<String>("output_dir").map(|d| d.as_str());
 
     let files = allocate_files(dir_option, file_option)?;
-    let catalog = build_catalog(lang_option)?;
+    let catalog = build_catalog(lang)?;
     let output_path = find_output_path(output_path_option)?;
 
     translate_files(catalog, files, output_path)?;
@@ -170,38 +115,88 @@ fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
-    #[test]
-    fn test_split_argument() {
-        assert_eq!(
-            split_argument(&"--po=lang.po".to_string()),
-            Some("lang.po".to_string())
-        );
-        assert_eq!(split_argument(&"--out src/resources".to_string()), None);
-        assert_eq!(split_argument(&"--invalid".to_string()), None);
-    }
-
-    #[test]
-    fn test_validate_file() -> anyhow::Result<()> {
-        let tmp_dir = tempfile::tempdir()?;
-        let md_path = tmp_dir.path().join("test.md");
-        let html_path = tmp_dir.path().join("test.html");
-        let source_path = md_path.to_str().unwrap();
-
-        let markdown_content = "# How to Foo from a specified file path\n\
+    static MARKDOWN_CONTENT: &str = "# How to Foo from a specified file path\n\
         \n\
         The first paragraph about Foo.\n\
         Still the first paragraph.*baz*\n";
 
-        let html_content = "<h1>Hello Foo! </h1>";
+    static INVALID_CONTENT: &str = "<p> This is not markdown content </p>";
 
-        let mut md_file = File::create(&md_path)?;
-        let mut html_file = File::create(&html_path)?;
-        write!(md_file, "{}", markdown_content)?;
-        write!(html_file, "{}", html_content)?;
+    fn create_temp_directory(
+        content: &str,
+        file_title: &str,
+    ) -> anyhow::Result<(TempDir, PathBuf)> {
+        let tmp_dir = tempfile::tempdir()?;
+        let file_path = tmp_dir.path().join(file_title);
 
-        assert_eq!(validate_file(&md_path), true);
-        assert_eq!(validate_file(&html_path), false);
+        fs::write(&file_path, content)?;
+
+        Ok((tmp_dir, file_path))
+    }
+
+    #[test]
+    fn test_allocate_files_with_dir() -> anyhow::Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        fs::write(tmp_dir.path().join("valid.md"), MARKDOWN_CONTENT)?;
+        fs::write(tmp_dir.path().join("invalid.html"), INVALID_CONTENT)?;
+        fs::write(tmp_dir.path().join("ibid.txt"), INVALID_CONTENT)?;
+
+        let valid_files = allocate_files(Some(tmp_dir.path().to_str().unwrap()), None)?;
+        assert_eq!(valid_files.len(), 1);
+        tmp_dir.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_allocate_files_valid_file() -> anyhow::Result<()> {
+        let (temp_dir, valid_file) = create_temp_directory(MARKDOWN_CONTENT, "test.md")?;
+        let valid_files = allocate_files(None, Some(valid_file.to_str().unwrap()))?;
+        assert_eq!(valid_files.len(), 1);
+
+        temp_dir.close()?;
+        Ok(())
+    }
+
+    #[test]
+    fn test_allocate_files_invalid_file() -> anyhow::Result<()> {
+        let (_, invalid_file) = create_temp_directory(INVALID_CONTENT, "wef.html")?;
+        let result = allocate_files(None, Some(invalid_file.to_str().unwrap()));
+
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_file() -> anyhow::Result<()> {
+        let (md_dir, md_path) = create_temp_directory(MARKDOWN_CONTENT, "test.md")?;
+        let (html_dir, html_path) = create_temp_directory(INVALID_CONTENT, "test.html")?;
+
+        assert!(validate_file(&md_path));
+        assert!(!validate_file(&html_path));
+
+        md_dir.close()?;
+        html_dir.close()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_catalog_nonexistent_file() {
+        let result = build_catalog("nonexistent.po");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_find_output_path_not_a_directory() -> anyhow::Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        let file_path = tmp_dir.path().join("wef.txt");
+        File::create(&file_path)?;
+
+        let result = find_output_path(Some(&file_path.to_str().unwrap().to_string()));
+        assert!(result.is_err());
 
         tmp_dir.close()?;
 
@@ -209,37 +204,42 @@ mod tests {
     }
 
     #[test]
-    fn test_build_catalog_none() {
-        let result = build_catalog(None);
-        assert!(result.is_err());
+    fn test_find_output_path_default() -> anyhow::Result<()> {
+        let default_output_path = find_output_path(None)?;
+        let dir_output_path = find_output_path(Some("wef_dir"))?;
+
+        assert_eq!(default_output_path, PathBuf::from("translated_md_files"));
+        assert_eq!(dir_output_path, PathBuf::from("wef_dir"));
+        assert!(default_output_path.is_dir() && dir_output_path.is_dir());
+
+        fs::remove_dir_all("translated_md_files")?;
+        fs::remove_dir_all("wef_dir")?;
+
+        Ok(())
     }
 
     #[test]
-    fn test_build_catalog_nonexistent_file() {
-        let result = build_catalog(Some("nonexistent.po".to_string()));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_allocate_files_neither_specified() {
-        let result = allocate_files(None, None);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_allocate_files_both_specified() {
-        let result = allocate_files(Some("dir".to_string()), Some("file".to_string()));
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_find_output_path_not_a_directory() -> anyhow::Result<()> {
+    fn test_find_output_path_given_existing_dir() -> anyhow::Result<()> {
         let tmp_dir = tempfile::tempdir()?;
-        let file_path = tmp_dir.path().join("file.txt");
-        File::create(&file_path)?;
+        let output_path = find_output_path(Some(tmp_dir.path().to_str().unwrap()))?;
+        assert_eq!(output_path, tmp_dir.path());
+        assert!(output_path.is_dir());
 
-        let result = find_output_path(Some(file_path.to_str().unwrap().to_string()));
-        assert!(result.is_err());
+        tmp_dir.close()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_output_path_given_invalid() -> anyhow::Result<()> {
+        let tmp_dir = tempfile::tempdir()?;
+        let tmp_file = tmp_dir.path().join("temp.md");
+        File::create(&tmp_file)?;
+
+        let file_result = find_output_path(Some(tmp_file.to_str().unwrap()));
+        let rogue_result = find_output_path(Some("\0"));
+
+        assert!(file_result.is_err() && rogue_result.is_err());
 
         tmp_dir.close()?;
 

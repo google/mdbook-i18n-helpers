@@ -12,6 +12,7 @@ description = "Plugins for a mdbook translation workflow based on Gettext."
 [dependencies]
 anyhow = "1.0.68"
 chrono = { version = "0.4.31", default-features = false, features = ["alloc"] }
+clap = "4.4.4"
 mdbook = { version = "0.4.25", default-features = false }
 polib = "0.2.0"
 pulldown-cmark = { version = "0.9.2", default-features = false }
