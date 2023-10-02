@@ -29,8 +29,11 @@ use polib::metadata::CatalogMetadata;
 use std::{fs, io};
 
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
+    let wrap_options = textwrap::Options::new(76)
+        .break_words(false)
+        .word_splitter(textwrap::WordSplitter::NoHyphenation);
     let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => format!("{}\n{}", msg.source(), source),
+        Some(msg) => textwrap::refill(&format!("{}\n{}", msg.source(), source), wrap_options),
         None => String::from(source),
     };
     let message = Message::build_singular()
