@@ -33,7 +33,7 @@ Please add your project below if it uses
 Run
 
 ```shell
-$ cargo install mdbook-i18n-helpers
+cargo install mdbook-i18n-helpers
 ```
 
 Please see [USAGE](i18n-helpers/USAGE.md) for how to translate your
