@@ -19,6 +19,8 @@ jobs:
         uses: actions/checkout@v3
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Test
         run: cargo test
@@ -35,18 +37,17 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: fuzz -> target
+          # Default is "v0-rust"
+          # Use a separate key to prevent collision with main cache
+          prefix-key: "fuzz"
+          # Cache only on main build
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-directories: |
+            i18n-helpers/fuzz/target
+            i18n-helpers/fuzz/corpus
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz
-
-      - name: Cache fuzz corpus
-        uses: actions/cache@v3
-        with:
-          path: fuzz/corpus
-          key: fuzz-corpus-${{ github.run_id }}
-          restore-keys: |
-            fuzz-corpus
 
       - name: Run group_events fuzzer and minimize corpus
         run: |
