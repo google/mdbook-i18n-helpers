@@ -59,7 +59,7 @@ impl Renderer {
     }
 
     pub(crate) fn render_book(&mut self) -> Result<()> {
-        let dest_dir = &self.ctx.destination.parent().unwrap();
+        let dest_dir = self.ctx.destination.parent().unwrap().to_owned();
         if !dest_dir.is_dir() {
             return Err(anyhow!("{dest_dir:?} is not a directory"));
         }
