@@ -63,7 +63,7 @@ impl Renderer {
         if !dest_dir.is_dir() {
             return Err(anyhow!("{dest_dir:?} is not a directory"));
         }
-        self.render_book_directory(dest_dir)
+        self.render_book_directory(&dest_dir)
     }
 
     fn render_book_directory(&mut self, path: &Path) -> Result<()> {
