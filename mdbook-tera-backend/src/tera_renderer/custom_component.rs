@@ -1,6 +1,5 @@
 use anyhow::Result;
 use serde::Deserialize;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tera::Tera;
@@ -8,15 +7,12 @@ use tera::Tera;
 pub struct CustomComponent {
     template: Tera,
     name: String,
-    /// Used to generate unique ids for each component to prevent collisions in javascript with query selectors.
-    counter: RefCell<u32>,
 }
 
 impl CustomComponent {
     pub fn new(name: &str, template: Tera) -> Result<CustomComponent> {
         Ok(CustomComponent {
             name: String::from(name),
-            counter: RefCell::new(0),
             template,
         })
     }
@@ -30,13 +26,15 @@ impl CustomComponent {
         tera_context: &tera::Context,
         attributes: BTreeMap<String, String>,
     ) -> Result<String> {
-        let counter = self.counter.replace_with(|&mut counter| counter + 1);
         let mut tera_context = tera_context.clone();
-        tera_context.insert("count", &counter);
         tera_context.insert("attributes", &attributes);
+        let output = self.template.render(&self.name, &tera_context);
 
-        let output = self.template.render(&self.name, &tera_context)?;
-        Ok(output)
+        if let Err(err) = &output {
+            println!("Error rendering component {}: {:?}", self.name, err);
+        }
+
+        Ok(output?)
     }
 
     pub fn component_name(&self) -> String {
@@ -45,6 +43,7 @@ impl CustomComponent {
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
 pub enum Component {
     Named { name: String, path: PathBuf },
     Anonymous(PathBuf),
@@ -53,7 +52,7 @@ pub enum Component {
 /// Configuration in `book.toml` `[output.tera-renderer]`.
 #[derive(Deserialize)]
 pub struct TeraRendererConfig {
-    /// Relative path to the templates directory.
+    /// Relative path to the templates directory from the `book.toml` directory.
     pub templates_dir: PathBuf,
     /// Custom HTML components to register.
     #[serde(default)]
@@ -74,7 +73,11 @@ impl TeraRendererConfig {
         Ok(())
     }
 
-    fn create_custom_components(&self, tera_template: &Tera) -> Result<Vec<CustomComponent>> {
+    fn create_custom_components(
+        &self,
+        tera_template: &Tera,
+        current_dir: &Path,
+    ) -> Result<Vec<CustomComponent>> {
         self.html_components
             .iter()
             .map(|component| {
@@ -85,12 +88,14 @@ impl TeraRendererConfig {
                         CustomComponent::new(name, template)?
                     }
                     Component::Anonymous(path) => {
+                        let mut template = tera_template.clone();
                         let name = path
-                            .file_name()
+                            .file_stem()
                             .unwrap_or_default()
                             .to_str()
                             .unwrap_or_default();
-                        CustomComponent::new(name, tera_template.clone())?
+                        template.add_template_file(current_dir.join(path), Some(name))?;
+                        CustomComponent::new(name, template)?
                     }
                 })
             })
@@ -106,7 +111,7 @@ impl TeraRendererConfig {
             &mut tera_template,
             &current_dir.join(&self.templates_dir),
         )?;
-        let components = self.create_custom_components(&tera_template)?;
+        let components = self.create_custom_components(&tera_template, current_dir)?;
 
         Ok((tera_template, components))
     }
