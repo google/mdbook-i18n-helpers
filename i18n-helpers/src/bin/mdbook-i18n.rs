@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use mdbook::renderer::RenderContext;
 use serde::Deserialize;
 use std::collections::BTreeMap;
@@ -24,10 +25,10 @@ struct I18nConfiguration {
     /// Default language code. It will not be translated.
     default_language: Option<String>,
 
-    /// Whether to translate all languages or just the selected language, defaults to false.
+    /// Whether to translate all languages or just the selected language in `mdbook.config.book.language`, defaults to false.
     #[serde(default)]
     translate_all_languages: bool,
-    /// Whether to move the translations to the html directory, defaults to false.
+    /// Whether to move the translations to their renderer's directory, defaults to false.
     ///
     /// By default, translations' output will live in `book/i18n/<language>/<renderer>`.
     /// For all renderers in this list, we will move individual translations to `book/<renderer>/<language>`.
@@ -35,22 +36,21 @@ struct I18nConfiguration {
     move_translations_directories: Vec<String>,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let mut stdin = io::stdin();
 
     // Get the configs
-    let ctx = RenderContext::from_json(&mut stdin).unwrap();
+    let ctx = RenderContext::from_json(&mut stdin)?;
     let i18n_config: I18nConfiguration = ctx
         .config
-        .get_deserialized_opt("output.i18n")
-        .unwrap()
-        .unwrap();
+        .get_deserialized_opt("output.i18n")?
+        .ok_or_else(|| anyhow!("No output.i18n config in book.toml"))?;
 
     if !i18n_config.translate_all_languages {
-        return;
+        return Ok(());
     }
 
-    let mut mdbook = mdbook::MDBook::load(&ctx.root).expect("Failed to load book");
+    let mut mdbook = mdbook::MDBook::load(&ctx.root)?;
     // Overwrite with current values from stdin. This is necessary because mdbook will add data to the config.
     mdbook.book = ctx.book.clone();
     mdbook.config = ctx.config.clone();
@@ -59,11 +59,11 @@ fn main() {
     let book_config = mdbook
         .config
         .get_mut("output.i18n")
-        .expect("No output.i18n config in book.toml");
+        .ok_or_else(|| anyhow!("No output.i18n config in book.toml"))?;
     // Set translate_all_languages to false for nested builds to prevent infinite recursion.
     book_config
         .as_table_mut()
-        .expect("output.i18n config in book.toml is not a table")
+        .ok_or_else(|| anyhow!("output.i18n config in book.toml is not a table"))?
         .insert(String::from("translate_all_languages"), false.into());
 
     let output_directory = ctx.destination;
@@ -74,7 +74,7 @@ fn main() {
         if Some(language) == ctx.config.book.language.as_ref() {
             continue;
         }
-        if default_language == Some(language) {
+        if default_language.as_ref() == Some(language) {
             continue;
         }
         let translation_path = output_directory.join(language);
@@ -83,23 +83,23 @@ fn main() {
         mdbook.config.book.language = Some(language.clone());
         mdbook.config.book.multilingual = true;
         mdbook.config.build.build_dir = translation_path;
-        mdbook
-            .build()
-            .unwrap_or_else(|_| panic!("Failed to build translation for language: {}", language));
+        mdbook.build()?;
         for renderer in &i18n_config.move_translations_directories {
-            std::fs::create_dir_all(output_directory.parent().unwrap().join(renderer))
-                .unwrap_or_else(|_| panic!("Failed to create html directory in output directory"));
+            std::fs::create_dir_all(
+                output_directory
+                    .parent()
+                    .ok_or_else(|| anyhow!("Failed to retrieve parent directory"))?
+                    .join(renderer),
+            )?;
             std::fs::rename(
                 output_directory.join(language).join(renderer),
                 output_directory
                     .parent()
-                    .unwrap()
+                    .ok_or_else(|| anyhow!("Failed to retrieve parent directory"))?
                     .join(renderer)
                     .join(language),
-            )
-            .unwrap_or_else(|_| {
-                panic!("Failed to move translation for language {language} to output directory")
-            });
+            )?;
         }
     }
+    Ok(())
 }
