@@ -1,6 +1,5 @@
-use super::error::RendererError;
 use super::CustomComponent;
-use crate::tera_renderer::error::Result;
+use anyhow::{anyhow, Result};
 use lol_html::html_content::ContentType;
 use lol_html::{element, RewriteStrSettings};
 use mdbook::renderer::RenderContext;
@@ -10,6 +9,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tera::Tera;
 
 pub struct RenderingContext<'a> {
     pub path: PathBuf,
@@ -38,14 +38,16 @@ pub(crate) struct Renderer {
     ctx: Arc<RenderContext>,
     serialized_ctx: serde_json::Value,
     components: Vec<CustomComponent>,
+    tera_template: Tera,
 }
 
 impl Renderer {
-    pub(crate) fn new(ctx: RenderContext) -> Result<Renderer> {
+    pub(crate) fn new(ctx: RenderContext, tera_template: Tera) -> Result<Renderer> {
         Ok(Renderer {
             serialized_ctx: serde_json::to_value(&ctx)?,
             ctx: Arc::new(ctx),
             components: Vec::new(),
+            tera_template,
         })
     }
 
@@ -79,17 +81,14 @@ impl Renderer {
             .destination
             .parent()
             .ok_or_else(|| {
-                RendererError::InvalidPath(format!(
+                anyhow!(
                     "Destination directory {:?} has no parent",
                     self.ctx.destination
-                ))
+                )
             })?
             .to_owned();
         if !dest_dir.is_dir() {
-            return Err(RendererError::InvalidPath(format!(
-                "{:?} is not a directory",
-                dest_dir
-            )));
+            return Err(anyhow!("{:?} is not a directory", dest_dir));
         }
         self.render_book_directory(&dest_dir)
     }
@@ -123,6 +122,18 @@ impl Renderer {
         Ok(())
     }
 
+    fn create_context(&self, rendering_context: &RenderingContext) -> tera::Context {
+        let mut context = tera::Context::new();
+        context.insert("path", &rendering_context.path);
+        context.insert("ctx", &rendering_context.serialized_ctx);
+        context.insert(
+            "book_dir",
+            &rendering_context.ctx.destination.parent().unwrap(),
+        );
+
+        context
+    }
+
     fn render_components(&mut self, file_content: &str, path: &Path) -> Result<String> {
         let rendering_context = RenderingContext::new(
             path.to_owned(),
@@ -130,6 +141,8 @@ impl Renderer {
             &self.serialized_ctx,
             &self.ctx,
         )?;
+        let tera_context = self.create_context(&rendering_context);
+        let rendered_file = self.tera_template.render_str(file_content, &tera_context)?;
         let custom_components_handlers = self
             .components
             .iter()
@@ -140,14 +153,14 @@ impl Renderer {
                         .iter()
                         .map(|attribute| (attribute.name(), attribute.value()))
                         .collect();
-                    let rendered = component.render(&rendering_context, attributes)?;
+                    let rendered = component.render(&tera_context, attributes)?;
                     el.replace(&rendered, ContentType::Html);
                     Ok(())
                 })
             })
             .collect();
         let output = lol_html::rewrite_str(
-            file_content,
+            &rendered_file,
             RewriteStrSettings {
                 element_content_handlers: custom_components_handlers,
                 ..RewriteStrSettings::default()

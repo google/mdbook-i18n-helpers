@@ -759,6 +759,7 @@ dependencies = [
 name = "mdbook-tera-backend"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "chrono",
  "lol_html",
  "mdbook",
@@ -766,7 +767,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tera",
- "thiserror",
 ]
 
 [[package]]
