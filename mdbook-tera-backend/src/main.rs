@@ -15,11 +15,11 @@ fn main() {
         .expect("Failed to get Gaia config")
         .unwrap();
 
-    let components = config
-        .create_components(&ctx.root)
+    let (tera_template, components) = config
+        .create_template_and_components(&ctx.root)
         .expect("Failed to create components");
 
-    let mut renderer = Renderer::new(ctx).expect("Failed to create renderer");
+    let mut renderer = Renderer::new(ctx, tera_template).expect("Failed to create renderer");
 
     for component in components {
         renderer.add_component(component);
