@@ -3,16 +3,16 @@ mod tera_renderer;
 use mdbook::renderer::RenderContext;
 use std::io;
 
-use crate::tera_renderer::*;
+use crate::tera_renderer::custom_component::TeraRendererConfig;
+use crate::tera_renderer::renderer::Renderer;
 
 fn main() {
     let mut stdin = io::stdin();
-    // Get the configs
     let ctx = RenderContext::from_json(&mut stdin).unwrap();
     let config: TeraRendererConfig = ctx
         .config
         .get_deserialized_opt("output.tera-backend")
-        .expect("Failed to get Gaia config")
+        .expect("Failed to get tera-backend config")
         .unwrap();
 
     let (tera_template, components) = config
