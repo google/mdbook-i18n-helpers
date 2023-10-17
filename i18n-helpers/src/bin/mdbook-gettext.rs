@@ -30,9 +30,28 @@ use mdbook::preprocess::{CmdPreprocessor, PreprocessorContext};
 use mdbook::BookItem;
 use mdbook_i18n_helpers::{extract_events, reconstruct_markdown, translate_events};
 use polib::catalog::Catalog;
+use polib::message::Message;
 use polib::po_file;
+use pulldown_cmark::Event;
 use semver::{Version, VersionReq};
 use std::{io, process};
+
+/// Strip formatting from a Markdown string.
+///
+/// The string can only contain inline text. Formatting such as
+/// emphasis and strong emphasis is removed.
+///
+/// Modelled after `mdbook::summary::stringify_events`.
+fn strip_formatting(text: &str) -> String {
+    extract_events(text, None)
+        .iter()
+        .filter_map(|(_, event)| match event {
+            Event::Text(text) | Event::Code(text) => Some(text.as_ref()),
+            Event::SoftBreak => Some(" "),
+            _ => None,
+        })
+        .collect()
+}
 
 fn translate(text: &str, catalog: &Catalog) -> String {
     let events = extract_events(text, None);
@@ -41,6 +60,37 @@ fn translate(text: &str, catalog: &Catalog) -> String {
     translated
 }
 
+/// Update `catalog` with stripped messages from `SUMMARY.md`.
+///
+/// While it is permissible to include formatting in the `SUMMARY.md`
+/// file, `mdbook` will strip it out when rendering the book. It will
+/// also strip formatting when sending the book to preprocessors.
+///
+/// To be able to find the translations for the `SUMMARY.md` file, we
+/// append versions of these messages stripped of formatting.
+fn add_stripped_summary_translations(catalog: &mut Catalog) {
+    let mut stripped_messages = Vec::new();
+    for msg in catalog.messages() {
+        // The `SUMMARY.md` filename is fixed, but we cannot assume
+        // that the file is at `src/SUMMARY.md` since the `src/`
+        // directory can be configured.
+        if !msg.source().contains("SUMMARY.md") {
+            continue;
+        }
+
+        let message = Message::build_singular()
+            .with_msgid(strip_formatting(msg.msgid()))
+            .with_msgstr(strip_formatting(msg.msgstr().unwrap()))
+            .done();
+        stripped_messages.push(message);
+    }
+
+    for msg in stripped_messages {
+        catalog.append_or_update(msg);
+    }
+}
+
+/// Translte an entire book.
 fn translate_book(ctx: &PreprocessorContext, mut book: Book) -> anyhow::Result<Book> {
     // Translation is a no-op when the target language is not set
     let language = match &ctx.config.book.language {
@@ -60,9 +110,10 @@ fn translate_book(ctx: &PreprocessorContext, mut book: Book) -> anyhow::Result<B
         return Ok(book);
     }
 
-    let catalog = po_file::parse(&path)
+    let mut catalog = po_file::parse(&path)
         .map_err(|err| anyhow!("{err}"))
         .with_context(|| format!("Could not parse {:?} as PO file", path))?;
+    add_stripped_summary_translations(&mut catalog);
     book.for_each_mut(|item| match item {
         BookItem::Chapter(ch) => {
             ch.content = translate(&ch.content, &catalog);
@@ -114,7 +165,7 @@ fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use polib::message::Message;
+    use polib::message::{Message, MessageMutView};
     use polib::metadata::CatalogMetadata;
     use pretty_assertions::assert_eq;
 
@@ -128,6 +179,37 @@ mod tests {
             catalog.append_or_update(message);
         }
         catalog
+    }
+
+    #[test]
+    fn test_add_stripped_summary_translations() {
+        // Add two messages which map to the same stripped message.
+        let mut catalog = create_catalog(&[
+            ("foo `bar`", "FOO `BAR`"),
+            ("**foo** _bar_", "**FOO** _BAR_"),
+        ]);
+        for (idx, mut msg) in catalog.messages_mut().enumerate() {
+            // Set the source to SUMMARY.md to ensure
+            // add_stripped_summary_translations will add a stripped
+            // version.
+            *msg.source_mut() = format!("src/SUMMARY.md:{idx}");
+        }
+        add_stripped_summary_translations(&mut catalog);
+
+        // We now have two messages, one with and one without
+        // formatting. This lets us handle both the TOC and any
+        // occurance on the page.
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid(), msg.msgstr().unwrap()))
+                .collect::<Vec<_>>(),
+            &[
+                ("src/SUMMARY.md:0", "foo `bar`", "FOO `BAR`"),
+                ("src/SUMMARY.md:1", "**foo** _bar_", "**FOO** _BAR_"),
+                ("", "foo bar", "FOO BAR")
+            ]
+        );
     }
 
     #[test]

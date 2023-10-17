@@ -22,11 +22,26 @@
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
-use mdbook_i18n_helpers::extract_messages;
+use mdbook_i18n_helpers::{extract_events, extract_messages, reconstruct_markdown};
 use polib::catalog::Catalog;
 use polib::message::Message;
 use polib::metadata::CatalogMetadata;
+use pulldown_cmark::{Event, Tag};
 use std::{fs, io};
+
+/// Strip an optional link from a Markdown string.
+fn strip_link(text: &str) -> String {
+    let events = extract_events(text, None)
+        .into_iter()
+        .filter_map(|(_, event)| match event {
+            Event::Start(Tag::Link(..)) => None,
+            Event::End(Tag::Link(..)) => None,
+            _ => Some((0, event)),
+        })
+        .collect::<Vec<_>>();
+    let (without_link, _) = reconstruct_markdown(&events, None);
+    without_link
+}
 
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
     let wrap_options = textwrap::Options::new(76)
@@ -59,31 +74,17 @@ fn create_catalog(ctx: &RenderContext) -> anyhow::Result<Catalog> {
     let mut catalog = Catalog::new(metadata);
 
     // First, add all chapter names and part titles from SUMMARY.md.
-    // The book items are in order of the summary, so we can assign
-    // correct line numbers for duplicate lines by tracking the index
-    // of our last search.
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
     let summary = std::fs::read_to_string(ctx.root.join(&summary_path))
         .with_context(|| anyhow!("Failed to read {}", summary_path.display()))?;
-    let mut last_idx = 0;
-    for item in ctx.book.iter() {
-        let line = match item {
-            BookItem::Chapter(chapter) => &chapter.name,
-            BookItem::PartTitle(title) => title,
-            BookItem::Separator => continue,
-        };
-
-        let idx = summary[last_idx..].find(line).ok_or_else(|| {
-            anyhow!(
-                "Could not find {line:?} in SUMMARY.md after line {} -- \
-                 please remove any formatting from SUMMARY.md",
-                summary[..last_idx].lines().count()
-            )
-        })?;
-        last_idx += idx;
-        let lineno = summary[..last_idx].lines().count();
+    for (lineno, msgid) in extract_messages(&summary) {
         let source = format!("{}:{}", summary_path.display(), lineno);
-        add_message(&mut catalog, line, &source);
+        // The summary is mostly links like "[Foo *Bar*](foo-bar.md)".
+        // We strip away the link to get "Foo *Bar*". The formatting
+        // is stripped away by mdbook when it sends the book to
+        // mdbook-gettext -- we keep the formatting here in case the
+        // same text is used for the page title.
+        add_message(&mut catalog, &strip_link(&msgid), &source);
     }
 
     // Next, we add the chapter contents.
@@ -148,6 +149,22 @@ mod tests {
     }
 
     #[test]
+    fn test_strip_link_empty() {
+        assert_eq!(strip_link(""), "");
+    }
+
+    #[test]
+    fn test_strip_link_text() {
+        assert_eq!(strip_link("Summary"), "Summary");
+    }
+
+    #[test]
+    fn test_strip_link_with_formatting() {
+        // The formatting is automatically normalized.
+        assert_eq!(strip_link("[foo *bar* `baz`](foo.md)"), "foo _bar_ `baz`");
+    }
+
+    #[test]
     fn test_create_catalog_defaults() -> anyhow::Result<()> {
         let (ctx, _tmp) =
             create_render_context(&[("book.toml", "[book]"), ("src/SUMMARY.md", "")])?;
@@ -183,15 +200,49 @@ mod tests {
 
     #[test]
     fn test_create_catalog_summary_formatting() -> anyhow::Result<()> {
-        // It is an error to include formatting in the summary file:
-        // it is stripped by mdbook and we cannot find it later when
-        // trying to translate the book.
         let (ctx, _tmp) = create_render_context(&[
             ("book.toml", "[book]"),
-            ("src/SUMMARY.md", "- [foo *bar* baz]()"),
+            (
+                "src/SUMMARY.md",
+                "# Summary\n\
+                 \n\
+                 [Prefix Chapter](prefix.md)\n\
+                 \n\
+                 # Part Title\n\
+                 \n\
+                 - [Foo *Bar*](foo.md)\n\
+                 \n\
+                 ----------\n\
+                 \n\
+                 - [Baz `Quux`](baz.md)\n\
+                 \n\
+                 [Suffix Chapter](suffix.md)",
+            ),
+            // Without this, mdbook would automatically create the
+            // files based on the summary above. This would add
+            // unnecessary headings below.
+            ("src/prefix.md", ""),
+            ("src/foo.md", ""),
+            ("src/baz.md", ""),
+            ("src/suffix.md", ""),
         ])?;
 
-        assert!(create_catalog(&ctx).is_err());
+        let catalog = create_catalog(&ctx)?;
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| msg.msgid())
+                .collect::<Vec<&str>>(),
+            &[
+                "Summary",
+                "Prefix Chapter",
+                "Part Title",
+                "Foo _Bar_",
+                "Baz `Quux`",
+                "Suffix Chapter",
+            ]
+        );
+
         Ok(())
     }
 
@@ -199,13 +250,13 @@ mod tests {
     fn test_create_catalog() -> anyhow::Result<()> {
         let (ctx, _tmp) = create_render_context(&[
             ("book.toml", "[book]"),
-            ("src/SUMMARY.md", "- [The Foo Chapter](foo.md)"),
+            ("src/SUMMARY.md", "- [The *Foo* Chapter](foo.md)"),
             (
                 "src/foo.md",
                 "# How to Foo\n\
                  \n\
-                 The first paragraph about Foo.\n\
-                 Still the first paragraph.\n",
+                 First paragraph.\n\
+                 Same paragraph.\n",
             ),
         ])?;
 
@@ -218,12 +269,12 @@ mod tests {
         assert_eq!(
             catalog
                 .messages()
-                .map(|msg| msg.msgid())
-                .collect::<Vec<&str>>(),
+                .map(|msg| (msg.source(), msg.msgid()))
+                .collect::<Vec<_>>(),
             &[
-                "The Foo Chapter",
-                "How to Foo",
-                "The first paragraph about Foo. Still the first paragraph.",
+                ("src/SUMMARY.md:1", "The _Foo_ Chapter"),
+                ("src/foo.md:1", "How to Foo"),
+                ("src/foo.md:3", "First paragraph. Same paragraph."),
             ]
         );
 
