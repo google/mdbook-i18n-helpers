@@ -1,7 +1,4 @@
-use super::custom_component::CustomComponent;
 use anyhow::{anyhow, Result};
-use lol_html::html_content::ContentType;
-use lol_html::{element, RewriteStrSettings};
 use mdbook::renderer::RenderContext;
 use serde_json::to_value;
 use std::collections::{BTreeMap, HashMap};
@@ -14,7 +11,6 @@ use tera::Tera;
 pub(crate) struct Renderer {
     ctx: Arc<RenderContext>,
     serialized_ctx: serde_json::Value,
-    components: Vec<CustomComponent>,
     counter: u64,
     tera_template: Tera,
 }
@@ -24,7 +20,6 @@ impl Renderer {
         let mut renderer = Renderer {
             serialized_ctx: serde_json::to_value(&ctx)?,
             ctx: Arc::new(ctx),
-            components: Vec::new(),
             counter: 0,
             tera_template,
         };
@@ -32,11 +27,6 @@ impl Renderer {
             .tera_template
             .register_function("get_context", renderer.create_get_context_function());
         Ok(renderer)
-    }
-
-    pub(crate) fn add_component(&mut self, mut component: CustomComponent) {
-        component.register_function("get_context", self.create_get_context_function());
-        self.components.push(component);
     }
 
     fn create_get_context_function(&self) -> impl tera::Function {
@@ -84,7 +74,7 @@ impl Renderer {
             return Ok(());
         }
         let file_content = std::fs::read_to_string(path)?;
-        let output = self.render_components(&file_content, path)?;
+        let output = self.render(&file_content, path)?;
         let mut output_file = fs::File::create(path)?;
         output_file.write_all(output.as_bytes())?;
         Ok(())
@@ -102,36 +92,13 @@ impl Renderer {
         context
     }
 
-    fn render_components(&mut self, file_content: &str, path: &Path) -> Result<String> {
+    fn render(&mut self, file_content: &str, path: &Path) -> Result<String> {
         let tera_context = self.create_context(path);
 
         let rendered_file = self
             .tera_template
             .render_str(file_content, &tera_context)
             .map_err(|e| anyhow!("Error rendering file {path:?}: {e:?}"))?;
-        let custom_components_handlers = self
-            .components
-            .iter()
-            .map(|component| {
-                element!(component.component_name(), |el| {
-                    let attributes: BTreeMap<String, String> = el
-                        .attributes()
-                        .iter()
-                        .map(|attribute| (attribute.name(), attribute.value()))
-                        .collect();
-                    let rendered = component.render(&tera_context, attributes)?;
-                    el.replace(&rendered, ContentType::Html);
-                    Ok(())
-                })
-            })
-            .collect();
-        let output = lol_html::rewrite_str(
-            &rendered_file,
-            RewriteStrSettings {
-                element_content_handlers: custom_components_handlers,
-                ..RewriteStrSettings::default()
-            },
-        )?;
-        Ok(output)
+        Ok(rendered_file)
     }
 }
