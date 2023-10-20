@@ -15,15 +15,11 @@ fn main() {
         .expect("Failed to get tera-backend config")
         .unwrap();
 
-    let (tera_template, components) = config
+    let tera_template = config
         .create_template_and_components(&ctx.root)
         .expect("Failed to create components");
 
     let mut renderer = Renderer::new(ctx, tera_template).expect("Failed to create renderer");
-
-    for component in components {
-        renderer.add_component(component);
-    }
 
     renderer.render_book().expect("Failed to render book");
 }
