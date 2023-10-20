@@ -16,7 +16,7 @@ fn main() {
         .unwrap();
 
     let tera_template = config
-        .create_template_and_components(&ctx.root)
+        .create_template(&ctx.root)
         .expect("Failed to create components");
 
     let mut renderer = Renderer::new(ctx, tera_template).expect("Failed to create renderer");

@@ -11,6 +11,7 @@ pub struct TeraRendererConfig {
 }
 
 impl TeraRendererConfig {
+    /// Recursively add all templates in the `templates_dir` to the `tera_template`.
     fn add_templates_recursively(tera_template: &mut Tera, directory: &Path) -> Result<()> {
         for entry in std::fs::read_dir(directory)? {
             let entry = entry?;
@@ -24,7 +25,8 @@ impl TeraRendererConfig {
         Ok(())
     }
 
-    pub fn create_template_and_components(&self, current_dir: &Path) -> Result<Tera> {
+    /// Create the `tera_template` and add all templates in the `templates_dir` to it.
+    pub fn create_template(&self, current_dir: &Path) -> Result<Tera> {
         let mut tera_template = Tera::default();
         Self::add_templates_recursively(
             &mut tera_template,
