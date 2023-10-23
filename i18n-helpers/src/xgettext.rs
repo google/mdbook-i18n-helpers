@@ -39,7 +39,7 @@ fn strip_link(text: &str) -> String {
     without_link
 }
 
-fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
+fn add_message(catalog: &mut Catalog, msgid: &str, source: &str, comment: &str) {
     let sources = match catalog.find_message(None, msgid, None) {
         Some(msg) => format!("{}\n{}", msg.source(), source),
         None => String::from(source),
@@ -47,6 +47,7 @@ fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
     let message = Message::build_singular()
         .with_source(sources)
         .with_msgid(String::from(msgid))
+        .with_comments(comment.into())
         .done();
     catalog.append_or_update(message);
 }
@@ -130,14 +131,20 @@ where
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
     let summary = summary_reader(ctx.root.join(&summary_path))
         .with_context(|| anyhow!("Failed to read {}", summary_path.display()))?;
-    for (lineno, msgid) in extract_messages(&summary) {
+    for (lineno, extracted_msg) in extract_messages(&summary) {
+        let msgid = extracted_msg.message;
         let source = build_source(&summary_path, lineno, granularity);
         // The summary is mostly links like "[Foo *Bar*](foo-bar.md)".
         // We strip away the link to get "Foo *Bar*". The formatting
         // is stripped away by mdbook when it sends the book to
         // mdbook-gettext -- we keep the formatting here in case the
         // same text is used for the page title.
-        add_message(&mut catalog, &strip_link(&msgid), &source);
+        add_message(
+            &mut catalog,
+            &strip_link(&msgid),
+            &source,
+            &extracted_msg.comment,
+        );
     }
 
     // Next, we add the chapter contents.
@@ -147,9 +154,10 @@ where
                 Some(path) => ctx.config.book.src.join(path),
                 None => continue,
             };
-            for (lineno, msgid) in extract_messages(&chapter.content) {
+            for (lineno, extracted) in extract_messages(&chapter.content) {
+                let msgid = extracted.message;
                 let source = build_source(&path, lineno, granularity);
-                add_message(&mut catalog, &msgid, &source);
+                add_message(&mut catalog, &msgid, &source, &extracted.comment);
             }
         }
     }

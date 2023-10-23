@@ -151,13 +151,34 @@ pub enum Group<'a> {
     ///
     /// This includes `[Text("foo")]` as well as sequences with text
     /// such as `[Start(Emphasis), Text("foo") End(Emphasis)]`.
-    Translate(Vec<(usize, Event<'a>)>),
+    Translate(Vec<(usize, Event<'a>)>, TranslateMetadata),
 
     /// Markdown events which should be skipped when translating.
     ///
     /// This includes structural events such as `Start(Heading(H1,
     /// None, vec![]))`.
     Skip(Vec<(usize, Event<'a>)>),
+}
+
+/// Store some extra information for a translation group.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct TranslateMetadata {
+    pub comments: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+struct GroupingContext {
+    skip_next_group: bool,
+    comments: Vec<String>,
+}
+
+impl GroupingContext {
+    fn clear_skip_next_group(self) -> Self {
+        Self {
+            skip_next_group: false,
+            ..self
+        }
+    }
 }
 
 /// Group Markdown events into translatable and skipped events.
@@ -169,7 +190,7 @@ pub enum Group<'a> {
 /// # Examples
 ///
 /// ```
-/// use mdbook_i18n_helpers::{extract_events, group_events, Group};
+/// use mdbook_i18n_helpers::{extract_events, group_events, Group, TranslateMetadata};
 /// use pulldown_cmark::{Event, Tag};
 ///
 /// let events = extract_events("- A list item.", None);
@@ -194,7 +215,7 @@ pub enum Group<'a> {
 ///         ]),
 ///         Group::Translate(vec![
 ///             (1, Event::Text("A list item.".into())),
-///         ]),
+///         ], TranslateMetadata::default()),
 ///         Group::Skip(vec![
 ///             (1, Event::End(Tag::Item)),
 ///             (1, Event::End(Tag::List(None))),
@@ -203,20 +224,6 @@ pub enum Group<'a> {
 /// );
 /// ```
 pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
-    #[derive(Debug)]
-    struct GroupingContext {
-        skip_next_group: bool,
-        // TODO: this struct is planned to expand with translator
-        // comments and message contexts.
-    }
-    impl GroupingContext {
-        fn clear_skip_next_group(self) -> Self {
-            Self {
-                skip_next_group: false,
-            }
-        }
-    }
-
     #[derive(Debug)]
     enum State {
         Translate(usize),
@@ -229,7 +236,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
             self,
             idx: usize,
             events: &'a [(usize, Event<'a>)],
-            ctx: GroupingContext,
+            mut ctx: GroupingContext,
         ) -> (Vec<Group<'a>>, GroupingContext) {
             match self {
                 State::Translate(start) => {
@@ -239,9 +246,17 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                             ctx.clear_skip_next_group(),
                         )
                     } else if is_codeblock_group(&events[start..idx]) {
-                        (parse_codeblock(&events[start..idx]), ctx)
+                        parse_codeblock(&events[start..idx], ctx)
                     } else {
-                        (vec![Group::Translate(events[start..idx].into())], ctx)
+                        (
+                            vec![Group::Translate(
+                                events[start..idx].into(),
+                                TranslateMetadata {
+                                    comments: std::mem::take(&mut ctx.comments),
+                                },
+                            )],
+                            ctx,
+                        )
                     }
                 }
                 State::Skip(start) => (vec![Group::Skip(events[start..idx].into())], ctx),
@@ -251,9 +266,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
 
     let mut groups = Vec::new();
     let mut state = State::Skip(0);
-    let mut ctx = GroupingContext {
-        skip_next_group: false,
-    };
+    let mut ctx = GroupingContext::default();
 
     for (idx, (_, event)) in events.iter().enumerate() {
         match event {
@@ -318,6 +331,22 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
 
                         ctx.skip_next_group = true;
                     }
+
+                    Some(directives::Directive::Comment(comment)) => {
+                        // If in the middle of translation, finish it.
+                        if let State::Translate(_) = state {
+                            let mut next_groups;
+                            (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                            groups.append(&mut next_groups);
+
+                            // Restart translation: subtle but should be
+                            // needed to handle the skipping of the rest of
+                            // the inlined content.
+                            state = State::Translate(idx);
+                        }
+
+                        ctx.comments.push(comment);
+                    }
                     // Otherwise, treat as a skipping group.
                     _ => {
                         if let State::Translate(_) = state {
@@ -346,7 +375,10 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     }
 
     match state {
-        State::Translate(start) => groups.push(Group::Translate(events[start..].into())),
+        State::Translate(start) => groups.push(Group::Translate(
+            events[start..].into(),
+            TranslateMetadata::default(),
+        )),
         State::Skip(start) => groups.push(Group::Skip(events[start..].into())),
     }
 
@@ -376,7 +408,10 @@ fn is_translate_scope(x: Scope) -> bool {
 }
 
 /// Creates groups by checking codeblock with heuristic way.
-fn heuristic_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
+fn heuristic_codeblock<'a>(
+    events: &'a [(usize, Event)],
+    mut ctx: GroupingContext,
+) -> (Vec<Group<'a>>, GroupingContext) {
     let is_translate = match events {
         [(_, Event::Start(Tag::CodeBlock(_))), .., (_, Event::End(Tag::CodeBlock(_)))] => {
             let (codeblock_text, _) = reconstruct_markdown(events, None);
@@ -389,14 +424,25 @@ fn heuristic_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
     };
 
     if is_translate {
-        vec![Group::Translate(events.into())]
+        (
+            vec![Group::Translate(
+                events.into(),
+                TranslateMetadata {
+                    comments: std::mem::take(&mut ctx.comments),
+                },
+            )],
+            ctx,
+        )
     } else {
-        vec![Group::Skip(events.into())]
+        (vec![Group::Skip(events.into())], ctx)
     }
 }
 
 /// Creates groups by parsing codeblock.
-fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
+fn parse_codeblock<'a>(
+    events: &'a [(usize, Event)],
+    mut ctx: GroupingContext,
+) -> (Vec<Group<'a>>, GroupingContext) {
     // Language detection from language identifier of codeblock.
     static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
     let ss = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
@@ -409,7 +455,7 @@ fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
 
     let Some(syntax) = syntax else {
         // If there is no language specifier, falling back to heuristic way.
-        return heuristic_codeblock(events);
+        return heuristic_codeblock(events, ctx);
     };
 
     let mut ps = ParseState::new(syntax);
@@ -423,7 +469,12 @@ fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
 
                 let Ok(ops) = ps.parse_line(text, ss) else {
                     // If parse is failed, the text event should be translated.
-                    ret.push(Group::Translate(events[idx..idx + 1].into()));
+                    ret.push(Group::Translate(
+                        events[idx..idx + 1].into(),
+                        TranslateMetadata {
+                            comments: std::mem::take(&mut ctx.comments),
+                        },
+                    ));
                     continue;
                 };
 
@@ -461,19 +512,42 @@ fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
                         translate_events.push((range_line, Event::Text(text.into())));
                     } else {
                         let whitespace_events = extract_trailing_whitespaces(&mut translate_events);
-                        groups.push(Group::Translate(std::mem::take(&mut translate_events)));
-                        groups.push(Group::Skip(whitespace_events));
+                        if !translate_events.is_empty() {
+                            groups.push(Group::Translate(
+                                std::mem::take(&mut translate_events),
+                                TranslateMetadata {
+                                    comments: std::mem::take(&mut ctx.comments),
+                                },
+                            ));
+                        }
+                        if !whitespace_events.is_empty() {
+                            groups.push(Group::Skip(whitespace_events));
+                        }
                         groups.push(Group::Skip(vec![(range_line, Event::Text(text.into()))]));
                     }
                 }
 
                 let whitespace_events = extract_trailing_whitespaces(&mut translate_events);
-                groups.push(Group::Translate(std::mem::take(&mut translate_events)));
-                groups.push(Group::Skip(whitespace_events));
+                if !translate_events.is_empty() {
+                    groups.push(Group::Translate(
+                        std::mem::take(&mut translate_events),
+                        TranslateMetadata {
+                            comments: std::mem::take(&mut ctx.comments),
+                        },
+                    ));
+                }
+                if !whitespace_events.is_empty() {
+                    groups.push(Group::Skip(whitespace_events));
+                }
 
                 if stack_failure {
                     // If stack operation is failed, the text event should be translated.
-                    ret.push(Group::Translate(events[idx..idx + 1].into()));
+                    ret.push(Group::Translate(
+                        events[idx..idx + 1].into(),
+                        TranslateMetadata {
+                            comments: std::mem::take(&mut ctx.comments),
+                        },
+                    ));
                 } else {
                     ret.append(&mut groups);
                 }
@@ -483,7 +557,7 @@ fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
             }
         }
     }
-    ret
+    (ret, ctx)
 }
 
 /// Extract trailing events which have whitespace only.
@@ -562,6 +636,20 @@ pub fn reconstruct_markdown(
     (String::from(markdown.trim_start_matches('\n')), new_state)
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ExtractedMessage {
+    pub message: String,
+    pub comment: String,
+}
+impl From<&str> for ExtractedMessage {
+    fn from(s: &str) -> Self {
+        ExtractedMessage {
+            message: s.to_owned(),
+            comment: "".into(),
+        }
+    }
+}
+
 /// Extract translatable strings from `document`.
 ///
 /// # Examples
@@ -609,20 +697,26 @@ pub fn reconstruct_markdown(
 ///     ],
 /// );
 /// ```
-pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
+pub fn extract_messages(document: &str) -> Vec<(usize, ExtractedMessage)> {
     let events = extract_events(document, None);
     let mut messages = Vec::new();
     let mut state = None;
 
     for group in group_events(&events) {
         match group {
-            Group::Translate(events) => {
+            Group::Translate(events, group_extra) => {
                 if let Some((lineno, _)) = events.first() {
                     let (text, new_state) = reconstruct_markdown(&events, state);
                     // Skip empty messages since they are special:
                     // they contains the PO file metadata.
                     if !text.trim().is_empty() {
-                        messages.push((*lineno, text));
+                        messages.push((
+                            *lineno,
+                            ExtractedMessage {
+                                message: text,
+                                comment: group_extra.comments.join(" "),
+                            },
+                        ));
                     }
                     state = Some(new_state);
                 }
@@ -690,7 +784,7 @@ pub fn translate_events<'a>(
 
     for group in group_events(events) {
         match group {
-            Group::Translate(events) => {
+            Group::Translate(events, _) => {
                 // Reconstruct the message.
                 let (msgid, new_state) = reconstruct_markdown(&events, state.clone());
                 let translated = catalog
@@ -739,7 +833,7 @@ mod tests {
         assert_eq!(
             extract_messages(document)
                 .iter()
-                .map(|(lineno, msg)| (*lineno, &msg[..]))
+                .map(|(lineno, msg)| (*lineno, &msg.message[..]))
                 .collect::<Vec<_>>(),
             expected,
         );
@@ -1501,6 +1595,116 @@ def g(x):
 ````
 "#,
             &[(2, "````\n```\n// codeblock in codeblock\n```\n````")],
+        );
+    }
+
+    #[test]
+    fn extract_message_comments() {
+        assert_eq!(
+            extract_messages(
+                "
+<!-- mdbook-xgettext:comment: first comment! -->
+Hello world!
+"
+            ),
+            vec![(
+                3,
+                ExtractedMessage {
+                    message: "Hello world!".into(),
+                    comment: "first comment!".into(),
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn extract_message_comments_multiple_joined() {
+        assert_eq!(
+            extract_messages(
+                "
+<!-- mdbook-xgettext:comment: this is a test -->
+<!-- mdbook-xgettext:comment: of a comment that spans. -->
+Greetings!
+"
+            ),
+            vec![(
+                4,
+                ExtractedMessage {
+                    message: "Greetings!".into(),
+                    comment: "this is a test of a comment that spans.".into(),
+                }
+            )]
+        );
+    }
+
+    #[test]
+    fn extract_message_multiple_comments() {
+        assert_eq!(
+            extract_messages(
+                "
+before-no-comment
+
+<!-- mdbook-xgettext:comment: another -->
+Hello again, this is some text
+with a comment on it.
+
+<!-- mdbook-xgettext:comment: one more comment. -->
+after
+
+after-no-comment
+"
+            ),
+            vec![
+                (
+                    2,
+                    ExtractedMessage {
+                        message: "before-no-comment".into(),
+                        comment: "".into(),
+                    }
+                ),
+                (
+                    5,
+                    ExtractedMessage {
+                        message: "Hello again, this is some text with a comment on it.".into(),
+                        comment: "another".into(),
+                    }
+                ),
+                (
+                    9,
+                    ExtractedMessage {
+                        message: "after".into(),
+                        comment: "one more comment.".into(),
+                    }
+                ),
+                (
+                    11,
+                    ExtractedMessage {
+                        message: "after-no-comment".into(),
+                        comment: "".into(),
+                    }
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_message_comments_on_codeblock() {
+        assert_eq!(
+            extract_messages(
+                r#"
+<!-- mdbook-xgettext:comment: greetings! -->
+```python
+print("Hello world")
+```
+"#
+            ),
+            vec![(
+                4,
+                ExtractedMessage {
+                    message: "\"Hello world\"".into(),
+                    comment: "greetings!".into(),
+                }
+            ),]
         );
     }
 }

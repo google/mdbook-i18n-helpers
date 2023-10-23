@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 #[derive(Debug, PartialEq)]
 pub enum Directive {
     Skip,
-    TranslatorComment(String),
+    Comment(String),
 }
 
 pub fn find(html: &str) -> Option<Directive> {
@@ -30,7 +30,7 @@ pub fn find(html: &str) -> Option<Directive> {
                 command.find("comment").unwrap() + "comment".len() + 1,
                 command.len(),
             );
-            Some(Directive::TranslatorComment(
+            Some(Directive::Comment(
                 command[start_of_comment_offset..].trim().into(),
             ))
         }
@@ -83,9 +83,9 @@ mod tests {
     }
 
     #[test]
-    fn test_translator_comment() {
+    fn test_comment() {
         assert!(match find("<!-- i18n:comment: hello world! -->") {
-            Some(Directive::TranslatorComment(s)) => {
+            Some(Directive::Comment(s)) => {
                 s == "hello world!"
             }
             _ => false,
@@ -93,9 +93,9 @@ mod tests {
     }
 
     #[test]
-    fn test_translator_empty_comment_does_nothing() {
+    fn test_empty_comment_does_nothing() {
         assert!(match find("<!-- i18n:comment -->") {
-            Some(Directive::TranslatorComment(s)) => {
+            Some(Directive::Comment(s)) => {
                 s.is_empty()
             }
             _ => false,
