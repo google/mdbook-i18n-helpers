@@ -1059,6 +1059,24 @@ The document[^1] text.
     }
 
     #[test]
+    fn extract_messages_backslashes() {
+        // Demonstrate how a single backslash in the Markdown becomes
+        // a backslash-escaped backslash when we extract the text.
+        // This is consistent with the CommonMark spec:
+        // https://spec.commonmark.org/0.30/#backslash-escapes.
+        // However, it causes problems for LaTeX preprocessors:
+        // https://github.com/google/mdbook-i18n-helpers/issues/105.
+        assert_extract_messages(
+            r#"
+$$
+\sum_{n=1}^{\infty} 2^{-n} = 1
+$$
+"#,
+            vec![(2, r#"$$ \\sum\_{n=1}^{\infty} 2^{-n} = 1 $$"#)],
+        )
+    }
+
+    #[test]
     fn test_is_comment_skip_directive_simple() {
         assert_eq!(
             is_comment_skip_directive("<!-- mdbook-xgettext:skip -->"),
