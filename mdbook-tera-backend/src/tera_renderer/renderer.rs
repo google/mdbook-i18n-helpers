@@ -31,23 +31,14 @@ use tera::Tera;
 /// ```
 pub(crate) struct Renderer {
     ctx: Arc<RenderContext>,
-    serialized_ctx: serde_json::Value,
-    counter: u64,
     tera_template: Tera,
 }
 
 impl Renderer {
     /// Create a new `Renderer` from the `RenderContext` and `Tera` template.
-    ///
-    /// # Arguments
-    ///
-    /// `ctx`: The `RenderContext` to be used for rendering. This is usually obtained from `stdin`.
-    /// `tera_template`: A pre-configured `Tera` template.
     pub(crate) fn new(ctx: RenderContext, tera_template: Tera) -> Result<Renderer> {
         let mut renderer = Renderer {
-            serialized_ctx: serde_json::to_value(&ctx)?,
             ctx: Arc::new(ctx),
-            counter: 0,
             tera_template,
         };
         renderer
@@ -56,11 +47,21 @@ impl Renderer {
         Ok(renderer)
     }
 
-    /// Render the book.
+    /// Render the book. This goes through the output of the HTML renderer
+    /// by considering all the output HTML files as input to the Tera template.
+    /// It overwrites the preexisting files with their Tera-rendered version.
     pub(crate) fn render_book(&mut self) -> Result<()> {
-        let dest_dir = self.ctx.destination.parent().unwrap().to_owned();
+        let dest_dir = self
+            .ctx
+            .destination
+            .parent()
+            .unwrap()
+            .join("html")
+            .to_owned();
         if !dest_dir.is_dir() {
-            return Err(anyhow!("{dest_dir:?} is not a directory"));
+            return Err(anyhow!(
+                "{dest_dir:?} is not a directory. Please make sure the HTML renderer is enabled."
+            ));
         }
         self.render_book_directory(&dest_dir)
     }
@@ -116,30 +117,19 @@ impl Renderer {
     /// # Arguments
     ///
     /// `path`: The path to the file that will be added as extra context to the renderer.
-    fn create_context(&mut self, path: &Path) -> tera::Context {
+    fn create_context(&mut self, path: &Path) -> Result<tera::Context> {
         let mut context = tera::Context::new();
         context.insert("path", path);
-        context.insert("ctx", &self.serialized_ctx);
+        context.insert("ctx", &serde_json::to_value(&*self.ctx)?);
         context.insert("book_dir", &self.ctx.destination.parent().unwrap());
-        context.insert("counter", &self.counter);
         context.insert("attributes", &BTreeMap::<String, String>::new());
-        self.counter += 1;
 
-        context
+        Ok(context)
     }
 
     /// Rendering logic for an individual file.
-    ///
-    /// # Arguments
-    ///
-    /// `file_content`: The content of the file to be rendered.
-    /// `path`: The path of the file to be rendered.
-    ///
-    /// # Returns
-    ///
-    /// The rendered file.
     fn render_file_content(&mut self, file_content: &str, path: &Path) -> Result<String> {
-        let tera_context = self.create_context(path);
+        let tera_context = self.create_context(path)?;
 
         let rendered_file = self
             .tera_template
