@@ -210,6 +210,9 @@ Itemized list:
 - C should be translated.
 ````
 
+Note that we don't extract the full text of code blocks. Only text that is
+recognized as comments and literal strings is extracted.
+
 ## Normalizing Existing PO Files
 
 When mdbook-i18n-helpers change, the generated PO files change as well. This can
