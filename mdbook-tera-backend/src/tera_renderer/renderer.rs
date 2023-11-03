@@ -107,9 +107,7 @@ impl Renderer {
         }
         let file_content = std::fs::read_to_string(path)?;
         let output = self.render_file_content(&file_content, path)?;
-        let mut output_file = fs::File::create(path)?;
-        output_file.write_all(output.as_bytes())?;
-        Ok(())
+        fs::write(path, output)
     }
 
     /// Creates the rendering context to be passed to the templates.
