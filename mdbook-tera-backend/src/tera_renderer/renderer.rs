@@ -120,7 +120,6 @@ impl Renderer {
         context.insert("path", path);
         context.insert("ctx", &serde_json::to_value(&*self.ctx)?);
         context.insert("book_dir", &self.ctx.destination.parent().unwrap());
-        context.insert("attributes", &BTreeMap::<String, String>::new());
 
         Ok(context)
     }
