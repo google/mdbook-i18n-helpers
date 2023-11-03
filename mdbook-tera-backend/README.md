@@ -1,4 +1,4 @@
-# [Tera](https://github.com/Keats/tera) backend extension for `mdbook`'s HTML backend
+# Tera backend extension for `mdbook`
 
 [![Visit crates.io](https://img.shields.io/crates/v/mdbook-i18n-helpers?style=flat-square)](https://crates.io/crates/mdbook-tera-backend)
 [![Build workflow](https://img.shields.io/github/actions/workflow/status/google/mdbook-i18n-helpers/test.yml?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/actions/workflows/test.yml?query=branch%3Amain)
@@ -26,12 +26,9 @@ and configure the place where youre templates will live.
 For instance `theme/templates`:
 
 ```toml
-...
-
+[output.html] # You must still enable the html backend.
 [output.tera-backend]
-templates_dir = "theme/templates"
-
-...
+template_dir = "theme/templates"
 ```
 
 ### Creating templates
@@ -41,20 +38,20 @@ Create your template files in the same directory as your book.
 ```html
 <!-- ./theme/templates/language_list.html -->
 <ul>
-{% for identifier, language_name in get_context(key="output.i18n.languages") %}
-    <li>{{ identifier }}: {{ language_name }}</li>
-{% endfor %}
+  {% for identifier, language_name in get_context(key="output.i18n.languages")
+  %}
+  <li>{{ identifier }}: {{ language_name }}</li>
+  {% endfor %}
 </ul>
 ```
 
 ### Using templates in `index.hbs`
 
 Since the HTML renderer will first render Handlebars templates, we need to tell it to
-ignore tera templates using `{{{{raw}}}}` blocks:
+ignore Tera templates using `{{{{raw}}}}` blocks:
 
 ```html
-{{{{raw}}}}
-{% set current_language = ctx | get(key="config") | get(key="book") | get(key="language", default="en") %}
+{{{{raw}}}} {% set current_language = ctx.config.book.language %}
 <p>CURRENT LANGUAGE: {{ current_language }}</p>
 <p>All languages: {% include "language_list.html" %}</p>
 {{{{/raw}}}}
@@ -74,7 +71,7 @@ release.
 ## Contact
 
 For questions or comments, please contact
-[Martin Geisler](mailto:mgeisler@google.com) or 
+[Martin Geisler](mailto:mgeisler@google.com) or
 [Alexandre Senges](mailto:asenges@google.come) or start a
 [discussion](https://github.com/google/mdbook-i18n-helpers/discussions). We
 would love to hear from you.
