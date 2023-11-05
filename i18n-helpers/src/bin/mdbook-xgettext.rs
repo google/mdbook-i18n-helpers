@@ -280,4 +280,29 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_create_catalog_duplicates() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            ("book.toml", "[book]"),
+            ("src/SUMMARY.md", "- [Foo](foo.md)"),
+            (
+                "src/foo.md",
+                "# Foo\n\
+                 \n\
+                 Foo\n",
+            ),
+        ])?;
+
+        let catalog = create_catalog(&ctx)?;
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid()))
+                .collect::<Vec<_>>(),
+            &[("src/SUMMARY.md:1 src/foo.md:1 src/foo.md:3", "Foo"),]
+        );
+
+        Ok(())
+    }
 }
