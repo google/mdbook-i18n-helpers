@@ -463,7 +463,11 @@ pub fn extract_messages(document: &str) -> Vec<(usize, String)> {
             Group::Translate(events) => {
                 if let Some((lineno, _)) = events.first() {
                     let (text, new_state) = reconstruct_markdown(events, state);
-                    messages.push((*lineno, text));
+                    // Skip empty messages since they are special:
+                    // they contains the PO file metadata.
+                    if !text.trim().is_empty() {
+                        messages.push((*lineno, text));
+                    }
                     state = Some(new_state);
                 }
             }
@@ -687,6 +691,16 @@ mod tests {
     #[test]
     fn extract_messages_empty() {
         assert_extract_messages("", vec![]);
+    }
+
+    #[test]
+    fn extract_messages_empty_html() {
+        assert_extract_messages("<span></span>", vec![]);
+    }
+
+    #[test]
+    fn extract_messages_whitespace_only() {
+        assert_extract_messages("<span>  </span>", vec![]);
     }
 
     #[test]
