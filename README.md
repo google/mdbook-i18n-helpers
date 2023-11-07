@@ -10,8 +10,8 @@ infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
 
 - [mdbook-i18n-helpers](./i18n-helpers/README.md): Gettext translation support
   for [mdbook](https://github.com/rust-lang/mdBook/)
-- [mdbook-tera-backend](./mdbook-tera-backend/README.md): Tera templates extension
-  for [mdbook](https://github.com/rust-lang/mdBook/)'s HTML renderer.
+- [mdbook-tera-backend](./mdbook-tera-backend/README.md): Tera templates
+  extension for [mdbook](https://github.com/rust-lang/mdBook/)'s HTML renderer.
 
 ## Showcases
 

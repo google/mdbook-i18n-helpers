@@ -5,9 +5,9 @@
 [![GitHub contributors](https://img.shields.io/github/contributors/google/mdbook-i18n-helpers?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/graphs/contributors)
 [![GitHub stars](https://img.shields.io/github/stars/google/mdbook-i18n-helpers?style=flat-square)](https://github.com/google/mdbook-i18n-helpers/stargazers)
 
-This `mdbook` backend makes it possible to use [tera](https://github.com/Keats/tera)
-templates and expand the capabilities of your books. It works on top of the default HTML
-backend.
+This `mdbook` backend makes it possible to use
+[tera](https://github.com/Keats/tera) templates and expand the capabilities of
+your books. It works on top of the default HTML backend.
 
 ## Installation
 

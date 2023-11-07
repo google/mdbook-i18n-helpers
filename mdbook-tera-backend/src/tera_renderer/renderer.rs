@@ -62,8 +62,9 @@ impl Renderer {
     /// `path`: The path to the file that will be added as extra context to the renderer.
     fn create_context(&mut self, path: &Path) -> Result<tera::Context> {
         let mut context = tera::Context::new();
-        context.insert("path", path);
-        context.insert("ctx", &serde_json::to_value(&self.ctx)?);
+        let book_dir = self.ctx.destination.parent().unwrap();
+        let relative_path = path.strip_prefix(book_dir).unwrap();
+        context.insert("path", &relative_path);
         context.insert("book_dir", &self.ctx.destination.parent().unwrap());
 
         Ok(context)
@@ -126,7 +127,8 @@ mod test {
 
     const HTML_FILE: &str = r#"
         <!DOCTYPE html>
-            {%include "test_template.html" %}
+            {% include "test_template.html" %}
+            PATH: {{ path }}
         </html>
     "#;
 
@@ -135,6 +137,7 @@ mod test {
     const RENDERED_HTML_FILE: &str = r#"
         <!DOCTYPE html>
             RENDERED
+            PATH: html/test.html
         </html>
     "#;
 
