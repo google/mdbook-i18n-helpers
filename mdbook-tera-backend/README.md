@@ -22,8 +22,8 @@ $ cargo install mdbook-tera-backend
 ### Configuring the backend
 
 To enable the backend, simply add `[output.tera-backend]` to your `book.toml`,
-and configure the place where youre templates will live.
-For instance `theme/templates`:
+and configure the place where youre templates will live. For instance
+`theme/templates`:
 
 ```toml
 [output.html] # You must still enable the html backend.
@@ -47,8 +47,8 @@ Create your template files in the same directory as your book.
 
 ### Using templates in `index.hbs`
 
-Since the HTML renderer will first render Handlebars templates, we need to tell it to
-ignore Tera templates using `{{{{raw}}}}` blocks:
+Since the HTML renderer will first render Handlebars templates, we need to tell
+it to ignore Tera templates using `{{{{raw}}}}` blocks:
 
 ```html
 {{{{raw}}}} {% set current_language = ctx.config.book.language %}
@@ -61,7 +61,8 @@ Includes names are based on the file name and not the whole file path.
 
 ### Tera documentation
 
-Find out all you can do with Tera templates [here](https://keats.github.io/tera/docs/).
+Find out all you can do with Tera templates
+[here](https://keats.github.io/tera/docs/).
 
 ## Changelog
 
