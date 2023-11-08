@@ -535,9 +535,8 @@ pub fn translate_events<'a>(
                 let (msgid, new_state) = reconstruct_markdown(events, state.clone());
                 let translated = catalog
                     .find_message(None, &msgid, None)
-                    .filter(|msg| !msg.flags().is_fuzzy())
-                    .and_then(|msg| msg.msgstr().ok())
-                    .filter(|msgstr| !msgstr.is_empty());
+                    .filter(|msg| !msg.flags().is_fuzzy() && msg.is_translated())
+                    .and_then(|msg| msg.msgstr().ok());
                 match translated {
                     Some(msgstr) => {
                         // Generate new events for `msgstr`, taking
