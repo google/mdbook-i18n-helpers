@@ -25,6 +25,39 @@ jobs:
       - name: Test
         run: cargo test
 
+  rust-book:
+    name: Test with Rust Book
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Install tools
+        run: |
+          sudo apt install gettext
+          # Debug builds are fine and slightly faster.
+          cargo install --debug --path i18n-helpers
+          cargo install --debug --locked --version 0.4.35 mdbook
+
+      - name: Checkout Rust Book
+        uses: actions/checkout@v4
+        with:
+          repository: rust-lang/book
+          # Update the commit hash once in a while to test newer
+          # versions.
+          ref: 5b6c1ceaa62ecbd6caef08df39b33b3938e99deb
+          path: rust-book
+
+      - name: Test extracting text from Rust Book
+        working-directory: rust-book
+        run: |
+          MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' mdbook build -d po
+          msgfmt -o /dev/null --statistics po/messages.pot
+
   fuzz:
     name: Fuzz test
     runs-on: ubuntu-latest
