@@ -51,8 +51,9 @@ Since the HTML renderer will first render Handlebars templates, we need to tell
 it to ignore Tera templates using `{{{{raw}}}}` blocks:
 
 ```html
-{{{{raw}}}} {% set current_language = ctx.config.book.language %}
-<p>CURRENT LANGUAGE: {{ current_language }}</p>
+{{{{raw}}}}
+{% set current_language = ctx.config.book.language %}
+<p>Current language: {{ current_language }}</p>
 <p>All languages: {% include "language_list.html" %}</p>
 {{{{/raw}}}}
 ```
