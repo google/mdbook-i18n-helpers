@@ -25,12 +25,21 @@ jobs:
       - name: Test
         run: cargo test
 
-  rust-book:
-    name: Test with Rust Book
+  test-other-books:
+    strategy:
+      matrix:
+        include:
+          # Update the refs below once in a while.
+          - repo: rust-lang/book
+            ref: 5b6c1ceaa62ecbd6caef08df39b33b3938e99deb
+          - repo: google/comprehensive-rust
+            ref: 0dfd087538ed4b52cf30cafb3b9add49cd6d204a
+
+    name: Test with ${{ matrix.repo }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -43,17 +52,15 @@ jobs:
           cargo install --debug --path i18n-helpers
           cargo install --debug --locked --version 0.4.35 mdbook
 
-      - name: Checkout Rust Book
+      - name: Checkout ${{ matrix.repo }}
         uses: actions/checkout@v4
         with:
-          repository: rust-lang/book
-          # Update the commit hash once in a while to test newer
-          # versions.
-          ref: 5b6c1ceaa62ecbd6caef08df39b33b3938e99deb
-          path: rust-book
+          repository: ${{ matrix.repo }}
+          ref: ${{ matrix.ref }}
+          path: example-book
 
-      - name: Test extracting text from Rust Book
-        working-directory: rust-book
+      - name: Test extracting text
+        working-directory: example-book
         run: |
           MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' mdbook build -d po
           msgfmt -o /dev/null --statistics po/messages.pot
