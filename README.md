@@ -41,7 +41,8 @@ Please see [USAGE](i18n-helpers/USAGE.md) for how to translate your
 
 ## Changelog
 
-Please see [CHANGELOG](CHANGELOG.md) for details on the changes in each release.
+Please see the [i18n-helpers/CHANGELOG](CHANGELOG) for details on the changes in
+each release.
 
 ## Contact
 
