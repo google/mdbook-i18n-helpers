@@ -8,8 +8,10 @@
 This repository contains the following crates that provide extensions and
 infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
 
-- [mdbook-i18n-helpers](i18n-helpers/README.md): Gettext translation support for
-  [mdbook](https://github.com/rust-lang/mdBook/)
+- [mdbook-i18n-helpers](./i18n-helpers/README.md): Gettext translation support
+  for [mdbook](https://github.com/rust-lang/mdBook/)
+- [mdbook-tera-backend](./mdbook-tera-backend/README.md): Tera templates
+  extension for [mdbook](https://github.com/rust-lang/mdBook/)'s HTML renderer.
 
 ## Showcases
 
@@ -39,10 +41,16 @@ cargo install mdbook-i18n-helpers
 Please see [USAGE](i18n-helpers/USAGE.md) for how to translate your
 [mdbook](https://github.com/rust-lang/mdBook/) project.
 
-## Changelog
-
 Please see the [i18n-helpers/CHANGELOG](CHANGELOG) for details on the changes in
 each release.
+
+### `mdbook-tera-backend`
+
+Run
+
+```shell
+$ cargo install mdbook-tera-backend
+```
 
 ## Contact
 
