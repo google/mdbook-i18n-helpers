@@ -36,13 +36,10 @@ template_dir = "theme/templates"
 Create your template files in the same directory as your book.
 
 ```html
-<!-- ./theme/templates/language_list.html -->
-<ul>
-  {% for identifier, language_name in get_context(key="output.i18n.languages")
-  %}
-  <li>{{ identifier }}: {{ language_name }}</li>
-  {% endfor %}
-</ul>
+<!-- ./theme/templates/hello_world.html -->
+<div>
+  Hello world!
+</div>
 ```
 
 ### Using templates in `index.hbs`
@@ -54,7 +51,7 @@ it to ignore Tera templates using `{{{{raw}}}}` blocks:
 {{{{raw}}}}
 {% set current_language = ctx.config.book.language %}
 <p>Current language: {{ current_language }}</p>
-<p>All languages: {% include "language_list.html" %}</p>
+{% include "hello_world.html" %}
 {{{{/raw}}}}
 ```
 
