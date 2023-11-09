@@ -73,7 +73,7 @@ fn load_catalog(ctx: &PreprocessorContext) -> anyhow::Result<Catalog> {
 
     let catalog = po_file::parse(&path)
         .map_err(|err| anyhow!("{err}"))
-        .with_context(|| format!("Could not parse {:?} as PO file", path))?;
+        .with_context(|| format!("Could not parse {path:?} as PO file"))?;
 
     Ok(catalog)
 }

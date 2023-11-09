@@ -72,7 +72,7 @@ struct SourceMap<'a> {
 
 impl<'a> SourceMap<'a> {
     /// Construct a map from source paths to links.
-    fn new(catalog: &'a Catalog) -> anyhow::Result<SourceMap<'a>> {
+    fn new(catalog: &'a Catalog) -> SourceMap<'a> {
         let mut messages = HashMap::<&str, Vec<_>>::new();
         for message in catalog.messages() {
             let path_linenos = message
@@ -88,11 +88,11 @@ impl<'a> SourceMap<'a> {
             }
         }
 
-        for (_, value) in messages.iter_mut() {
+        for value in messages.values_mut() {
             value.sort();
         }
 
-        Ok(SourceMap { messages })
+        SourceMap { messages }
     }
 
     /// Extract messages for `message`.
@@ -168,7 +168,7 @@ impl<'a> SourceMap<'a> {
 /// messages for the `msgid` and `msgstr` fields, then the result is
 /// marked fuzzy. The extra messages are dropped.
 pub fn normalize(catalog: Catalog) -> anyhow::Result<Catalog> {
-    let source_map = SourceMap::new(&catalog)?;
+    let source_map = SourceMap::new(&catalog);
 
     // Accumulate new messages here to avoid constructing a `Catalog`
     // via a partial move from `catalog`.
@@ -201,7 +201,7 @@ pub fn normalize(catalog: Catalog) -> anyhow::Result<Catalog> {
                     .collect::<Vec<_>>()
                     .join("\n\n");
                 new_msgstrs.truncate(new_msgids.len() - 1);
-                new_msgstrs.push((0, tail))
+                new_msgstrs.push((0, tail));
             }
             std::cmp::Ordering::Greater => {
                 // Set missing msgstr entries to "".
