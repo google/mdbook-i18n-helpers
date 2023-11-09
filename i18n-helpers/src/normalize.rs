@@ -474,23 +474,7 @@ mod tests {
              * BAR\n\
              ```",
         )]);
-        assert_normalized_messages_eq(
-            catalog,
-            &[exact(
-                "```rust,editable\n\
-                 // Example\n\
-                 foo\n\
-                 \n\
-                 * bar\n\
-                 ```",
-                "```rust,editable\n\
-                 // Beispiel\n\
-                 FOO\n\
-                 \n\
-                 * BAR\n\
-                 ```",
-            )],
-        );
+        assert_normalized_messages_eq(catalog, &[exact("// Example\n", "// Beispiel\n")]);
     }
 
     #[test]

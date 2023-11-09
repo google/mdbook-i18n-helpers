@@ -212,21 +212,21 @@ mod tests {
 
     #[test]
     fn test_translate_code_block() {
-        let catalog = create_catalog(&[(
-            "```rust,editable\n\
-             fn foo() {\n\n    let x = \"hello\";\n\n}\n\
-             ```",
-            "```rust,editable\n\
-             fn FOO() {\n\n    let X = \"guten tag\";\n\n}\n\
-             ```",
-        )]);
+        let catalog = create_catalog(&[
+            ("\"hello\"", "\"guten tag\""),
+            ("// line comment\n", "// linie kommentar\n"),
+            ("/* block\ncomment */", "/* block\nkommentar */"),
+            ("/* inline comment */", "/* inline kommentar */"),
+        ]);
         assert_eq!(
             translate(
                 "Text before.\n\
                  \n\
                  \n\
                  ```rust,editable\n\
-                 fn foo() {\n\n    let x = \"hello\";\n\n}\n\
+                 // line comment\n\
+                 fn foo() {\n\n    let x /* inline comment */ = \"hello\"; // line comment\n\n}\n\
+                 /* block\ncomment */\n\
                  ```\n\
                  \n\
                  Text after.\n",
@@ -235,7 +235,9 @@ mod tests {
             "Text before.\n\
              \n\
              ```rust,editable\n\
-             fn FOO() {\n\n    let X = \"guten tag\";\n\n}\n\
+             // linie kommentar\n\
+             fn foo() {\n\n    let x /* inline kommentar */ = \"guten tag\"; // linie kommentar\n\n}\n\
+             /* block\nkommentar */\n\
              ```\n\
              \n\
              Text after.",
