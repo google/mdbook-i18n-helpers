@@ -1,6 +1,6 @@
 # Changelog
 
-This lists the most important changes between releases.
+This lists the most important changes between releases of mdbook-i18n-helpers.
 
 ## Version 0.2.4 (2023-09-27)
 
