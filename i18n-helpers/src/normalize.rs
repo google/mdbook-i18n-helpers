@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 
-use super::{extract_messages, new_cmark_parser};
+use crate::{extract_messages, new_cmark_parser, wrap_sources};
 use polib::catalog::Catalog;
 use polib::message::{Message, MessageFlags, MessageMutView, MessageView};
 use pulldown_cmark::{Event, LinkType, Tag};
@@ -30,7 +30,7 @@ fn compute_source(source: &str, delta: usize) -> String {
         }
     }
 
-    new_source
+    wrap_sources(&new_source)
 }
 
 /// Check if `text` contains one or more broken reference links.

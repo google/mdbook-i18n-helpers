@@ -34,6 +34,17 @@ use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
 pub mod gettext;
 pub mod normalize;
 
+/// Re-wrap the sources field of a message.
+///
+/// This function tries to wrap the `file:lineno` pairs so they look
+/// the same as what you get from `msgcat` or `msgmerge`.
+pub fn wrap_sources(sources: &str) -> String {
+    let options = textwrap::Options::new(76)
+        .break_words(false)
+        .word_splitter(textwrap::WordSplitter::NoHyphenation);
+    textwrap::refill(sources, options)
+}
+
 /// Like `mdbook::utils::new_cmark_parser`, but also passes a
 /// `BrokenLinkCallback`.
 pub fn new_cmark_parser<'input, 'callback>(
