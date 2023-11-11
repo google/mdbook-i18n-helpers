@@ -26,11 +26,11 @@
 use polib::catalog::Catalog;
 use pulldown_cmark::{CodeBlockKind, Event, LinkType, Tag};
 use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
-use regex::Regex;
 use std::sync::OnceLock;
 use syntect::easy::ScopeRangeIterator;
 use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
 
+pub mod directives;
 pub mod gettext;
 pub mod normalize;
 
@@ -298,22 +298,34 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                 }
             }
 
-            // An HTML comment directive to skip the next translation
-            // group.
-            Event::Html(s) if is_comment_skip_directive(s) => {
-                // If in the middle of translation, finish it.
-                if let State::Translate(_) = state {
-                    let mut next_groups;
-                    (next_groups, ctx) = state.into_groups(idx, events, ctx);
-                    groups.append(&mut next_groups);
+            Event::Html(s) => {
+                match directives::find(s) {
+                    Some(directives::Directive::Skip) => {
+                        // If in the middle of translation, finish it.
+                        if let State::Translate(_) = state {
+                            let mut next_groups;
+                            (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                            groups.append(&mut next_groups);
 
-                    // Restart translation: subtle but should be
-                    // needed to handle the skipping of the rest of
-                    // the inlined content.
-                    state = State::Translate(idx);
+                            // Restart translation: subtle but should be
+                            // needed to handle the skipping of the rest of
+                            // the inlined content.
+                            state = State::Translate(idx);
+                        }
+
+                        ctx.skip_next_group = true;
+                    }
+                    // Otherwise, treat as a skipping group.
+                    _ => {
+                        if let State::Translate(_) = state {
+                            let mut next_groups;
+                            (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                            groups.append(&mut next_groups);
+
+                            state = State::Skip(idx);
+                        }
+                    }
                 }
-
-                ctx.skip_next_group = true;
             }
 
             // All other block-level events start or continue a
@@ -336,15 +348,6 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     }
 
     groups
-}
-
-/// Check whether the HTML is a directive to skip the next translation group.
-fn is_comment_skip_directive(html: &str) -> bool {
-    static RE: OnceLock<Regex> = OnceLock::new();
-
-    let re =
-        RE.get_or_init(|| Regex::new(r"<!-{2,}\s*mdbook-xgettext\s*:\s*skip\s*-{2,}>").unwrap());
-    re.is_match(html.trim())
 }
 
 /// Returns true if the events appear to be a codeblock.
@@ -1305,45 +1308,7 @@ $$
     }
 
     #[test]
-    fn test_is_comment_skip_directive_simple() {
-        assert_eq!(
-            is_comment_skip_directive("<!-- mdbook-xgettext:skip -->"),
-            true
-        );
-    }
 
-    #[test]
-    fn test_is_comment_skip_directive_tolerates_spaces() {
-        assert_eq!(
-            is_comment_skip_directive("<!-- mdbook-xgettext: skip -->"),
-            true
-        );
-    }
-
-    #[test]
-    fn test_is_comment_skip_directive_tolerates_dashes() {
-        assert_eq!(
-            is_comment_skip_directive("<!--- mdbook-xgettext:skip ---->"),
-            true
-        );
-    }
-
-    #[test]
-    fn test_is_comment_skip_directive_needs_skip() {
-        assert_eq!(
-            is_comment_skip_directive("<!-- mdbook-xgettext: foo -->"),
-            false
-        );
-    }
-    #[test]
-    fn test_is_comment_skip_directive_needs_to_be_a_comment() {
-        assert_eq!(
-            is_comment_skip_directive("<div>mdbook-xgettext: skip</div>"),
-            false
-        );
-    }
-
-    #[test]
     fn extract_messages_skip_simple() {
         assert_extract_messages(
             r"<!-- mdbook-xgettext:skip -->
