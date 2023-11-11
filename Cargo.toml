@@ -1,6 +1,6 @@
 [workspace]
 members = ["i18n-helpers", "mdbook-tera-backend"]
-default-members = ["i18n-helpers"]
+default-members = ["i18n-helpers", "mdbook-tera-backend"]
 resolver = "2"
 
 [workspace.dependencies]
