@@ -9,6 +9,9 @@ license = "Apache-2.0"
 repository = "https://github.com/google/mdbook-i18n-helpers"
 description = "Plugin to extend mdbook with Tera templates and custom HTML components."
 
+[lints]
+workspace = true
+
 [dependencies]
 anyhow.workspace = true
 mdbook.workspace = true

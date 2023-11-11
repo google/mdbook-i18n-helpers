@@ -3,6 +3,11 @@ members = ["i18n-helpers", "mdbook-tera-backend"]
 default-members = ["i18n-helpers", "mdbook-tera-backend"]
 resolver = "2"
 
+[workspace.lints.clippy]
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+
 [workspace.dependencies]
 anyhow = "1.0.79"
 mdbook = { version = "0.4.36", default-features = false }
