@@ -132,11 +132,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clippy
-        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
+        run: cargo clippy --all-targets -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
 
       - name: Clippy on fuzzers
         working-directory: ./i18n-helpers/fuzz
-        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
+        run: cargo clippy --all-targets -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
 
   format:
     name: Format
