@@ -84,80 +84,58 @@ impl Renderer {
 
 #[cfg(test)]
 mod test {
-    use tempdir::TempDir;
-
     use super::*;
     use crate::tera_renderer::custom_component::TeraRendererConfig;
-    use anyhow::Result;
+    use anyhow::Context;
+    use mdbook::MDBook;
 
-    const RENDER_CONTEXT_STR: &str = r#"
-    {
-        "version":"0.4.32",
-        "root":"",
-        "book":{
-           "sections": [],
-           "__non_exhaustive": null
-        },
-        "destination": "",
-        "config":{
-           "book":{
-              "authors":[
-                 "Martin Geisler"
-              ],
-              "language":"en",
-              "multilingual":false,
-              "src":"src",
-              "title":"Comprehensive Rust 🦀"
-           },
-           "build":{
-              "build-dir":"book",
-              "use-default-preprocessors":true
-           },
-           "output":{
-              "tera-backend": {
-                    "template_dir": "templates"
-              },
-              "renderers":[
-                 "html",
-                 "tera-backend"
-              ]
-           }
+    fn create_render_context(
+        files: &[(&str, &str)],
+    ) -> anyhow::Result<(RenderContext, tempfile::TempDir)> {
+        let tmpdir = tempfile::tempdir().context("Could not create temporary directory")?;
+
+        for (path, contents) in files {
+            let path = tmpdir.path().join(path);
+            let dir = path
+                .parent()
+                .with_context(|| format!("Could not find parent in {}", path.display()))?;
+            std::fs::create_dir_all(dir)
+                .with_context(|| format!("Could not create {}", dir.display()))?;
+            std::fs::write(&path, contents)
+                .with_context(|| format!("Could not write {}", path.display()))?;
         }
-     }"#;
 
-    const HTML_FILE: &str = r#"
-        <!DOCTYPE html>
-            {% include "test_template.html" %}
-            PATH: {{ path }}
-        </html>
-    "#;
-
-    const TEMPLATE_FILE: &str = "RENDERED";
-
-    const RENDERED_HTML_FILE: &str = r"
-        <!DOCTYPE html>
-            RENDERED
-            PATH: html/test.html
-        </html>
-    ";
+        let mdbook = MDBook::load(tmpdir.path()).context("Could not load book")?;
+        let dest = mdbook.build_dir_for("tera-backend");
+        let ctx = RenderContext::new(mdbook.root, mdbook.book, mdbook.config, dest);
+        Ok((ctx, tmpdir))
+    }
 
     #[test]
-    fn test_renderer() -> Result<()> {
-        let mut ctx = RenderContext::from_json(RENDER_CONTEXT_STR.as_bytes()).unwrap();
+    fn test_renderer() -> anyhow::Result<()> {
+        let (ctx, tmpdir) = create_render_context(&[
+            (
+                "book.toml",
+                r#"
+                    [book]
+                    title = "Foo"
 
-        let tmp_dir = TempDir::new("output")?;
-        let html_path = tmp_dir.path().join("html");
-        let templates_path = tmp_dir.path().join("templates");
+                    [output.html]
 
-        std::fs::create_dir(&html_path)?;
-        std::fs::create_dir(&templates_path)?;
-
-        let html_file_path = html_path.join("test.html");
-        std::fs::write(&html_file_path, HTML_FILE)?;
-        std::fs::write(templates_path.join("test_template.html"), TEMPLATE_FILE)?;
-
-        ctx.destination = tmp_dir.path().join("tera-renderer");
-        ctx.root = tmp_dir.path().to_owned();
+                    [output.tera-backend]
+                    template_dir = "templates"
+                "#,
+            ),
+            ("src/SUMMARY.md", ""),
+            (
+                "book/html/test.html",
+                r#"
+                    {% include "test_template.html" %}
+                    Path: {{ path }}
+                "#,
+            ),
+            ("templates/test_template.html", "From test_template"),
+        ])?;
 
         let config: TeraRendererConfig = ctx
             .config
@@ -168,7 +146,13 @@ mod test {
         let mut renderer = Renderer::new(ctx, tera_template);
         renderer.render_book().expect("Failed to render book");
 
-        assert_eq!(std::fs::read_to_string(html_file_path)?, RENDERED_HTML_FILE);
+        assert_eq!(
+            std::fs::read_to_string(tmpdir.path().join("book/html/test.html"))?,
+            r"
+                    From test_template
+                    Path: html/test.html
+                "
+        );
         Ok(())
     }
 }
