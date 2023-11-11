@@ -60,19 +60,19 @@ impl Renderer {
     /// # Arguments
     ///
     /// `path`: The path to the file that will be added as extra context to the renderer.
-    fn create_context(&mut self, path: &Path) -> Result<tera::Context> {
+    fn create_context(&mut self, path: &Path) -> tera::Context {
         let mut context = tera::Context::new();
         let book_dir = self.ctx.destination.parent().unwrap();
         let relative_path = path.strip_prefix(book_dir).unwrap();
         context.insert("path", &relative_path);
         context.insert("book_dir", &self.ctx.destination.parent().unwrap());
 
-        Ok(context)
+        context
     }
 
     /// Rendering logic for an individual file.
     fn render_file_content(&mut self, file_content: &str, path: &Path) -> Result<String> {
-        let tera_context = self.create_context(path)?;
+        let tera_context = self.create_context(path);
 
         let rendered_file = self
             .tera_template
@@ -134,12 +134,12 @@ mod test {
 
     const TEMPLATE_FILE: &str = "RENDERED";
 
-    const RENDERED_HTML_FILE: &str = r#"
+    const RENDERED_HTML_FILE: &str = r"
         <!DOCTYPE html>
             RENDERED
             PATH: html/test.html
         </html>
-    "#;
+    ";
 
     #[test]
     fn test_renderer() -> Result<()> {

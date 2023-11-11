@@ -76,13 +76,7 @@ pub fn new_cmark_parser<'input, 'callback>(
 /// );
 /// ```
 pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(usize, Event<'a>)> {
-    // Offsets of each newline in the input, used to calculate line
-    // numbers from byte offsets.
-    let offsets = text
-        .match_indices('\n')
-        .map(|(offset, _)| offset)
-        .collect::<Vec<_>>();
-
+    // Expand a `[foo]` style link into `[foo][foo]`.
     fn expand_shortcut_link(tag: Tag) -> Tag {
         match tag {
             Tag::Link(LinkType::Shortcut, reference, title) => {
@@ -94,6 +88,13 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
             _ => tag,
         }
     }
+
+    // Offsets of each newline in the input, used to calculate line
+    // numbers from byte offsets.
+    let offsets = text
+        .match_indices('\n')
+        .map(|(offset, _)| offset)
+        .collect::<Vec<_>>();
 
     match state {
         // If we're in a code block, we disable the normal parsing and
@@ -115,10 +116,10 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
                     // in output. By changing them to a reference
                     // link, the link is expanded on the fly and the
                     // output becomes self-contained.
-                    Event::Start(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
+                    Event::Start(tag @ (Tag::Link(..) | Tag::Image(..))) => {
                         Event::Start(expand_shortcut_link(tag))
                     }
-                    Event::End(tag @ Tag::Link(..) | tag @ Tag::Image(..)) => {
+                    Event::End(tag @ (Tag::Link(..) | Tag::Image(..))) => {
                         Event::End(expand_shortcut_link(tag))
                     }
                     _ => event,
@@ -188,8 +189,6 @@ pub enum Group<'a> {
 /// );
 /// ```
 pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
-    let mut groups = Vec::new();
-
     #[derive(Debug)]
     struct GroupingContext {
         skip_next_group: bool,
@@ -236,6 +235,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
         }
     }
 
+    let mut groups = Vec::new();
     let mut state = State::Skip(0);
     let mut ctx = GroupingContext {
         skip_next_group: false,
@@ -715,14 +715,14 @@ mod tests {
 
     /// Extract messages in `document`, assert they match `expected`.
     #[track_caller]
-    fn assert_extract_messages(document: &str, expected: Vec<(usize, &str)>) {
+    fn assert_extract_messages(document: &str, expected: &[(usize, &str)]) {
         assert_eq!(
             extract_messages(document)
                 .iter()
                 .map(|(lineno, msg)| (*lineno, &msg[..]))
                 .collect::<Vec<_>>(),
             expected,
-        )
+        );
     }
 
     #[test]
@@ -825,22 +825,22 @@ mod tests {
 
     #[test]
     fn extract_messages_empty() {
-        assert_extract_messages("", vec![]);
+        assert_extract_messages("", &[]);
     }
 
     #[test]
     fn extract_messages_empty_html() {
-        assert_extract_messages("<span></span>", vec![]);
+        assert_extract_messages("<span></span>", &[]);
     }
 
     #[test]
     fn extract_messages_whitespace_only() {
-        assert_extract_messages("<span>  </span>", vec![]);
+        assert_extract_messages("<span>  </span>", &[]);
     }
 
     #[test]
     fn extract_messages_single_line() {
-        assert_extract_messages("This is a paragraph.", vec![(1, "This is a paragraph.")]);
+        assert_extract_messages("This is a paragraph.", &[(1, "This is a paragraph.")]);
     }
 
     #[test]
@@ -851,7 +851,7 @@ mod tests {
              paragraph.🦀\n\
              \n\
              Second paragraph.",
-            vec![
+            &[
                 (1, "This is the first paragraph.🦀"),
                 (5, "Second paragraph."),
             ],
@@ -866,7 +866,7 @@ mod tests {
              \n\
              This is the\n\
              first paragraph.",
-            vec![(4, "This is the first paragraph.")],
+            &[(4, "This is the first paragraph.")],
         );
     }
 
@@ -877,7 +877,7 @@ mod tests {
              a paragraph.\n\
              \n\
              \n",
-            vec![(1, "This is a paragraph.")],
+            &[(1, "This is a paragraph.")],
         );
     }
 
@@ -887,7 +887,7 @@ mod tests {
         // "__strong emphasis__" to "**strong emphasis**".
         assert_extract_messages(
             "**This** __~~message~~__ _has_ `code` *style*\n",
-            vec![(1, "**This** **~~message~~** _has_ `code` _style_")],
+            &[(1, "**This** **~~message~~** _has_ `code` _style_")],
         );
     }
 
@@ -896,7 +896,7 @@ mod tests {
         // HTML tags are skipped, but text inside is extracted:
         assert_extract_messages(
             "Hi <script>alert('there');</script>",
-            vec![
+            &[
                 (1, "Hi "), //
                 (1, "alert('there');"),
             ],
@@ -907,7 +907,7 @@ mod tests {
     fn extract_messages_inline_link() {
         assert_extract_messages(
             "See [this page](https://example.com) for more info.",
-            vec![(1, "See [this page](https://example.com) for more info.")],
+            &[(1, "See [this page](https://example.com) for more info.")],
         );
     }
 
@@ -917,7 +917,7 @@ mod tests {
             "See [this page][1] for more info.\n\n\
              [1]: https://example.com",
             // The parser expands reference links on the fly.
-            vec![(1, "See [this page](https://example.com) for more info.")],
+            &[(1, "See [this page](https://example.com) for more info.")],
         );
     }
 
@@ -927,7 +927,7 @@ mod tests {
         assert_extract_messages(
             "Click [here][]!\n\n\
              [here]: http://example.net/",
-            vec![(1, "Click [here](http://example.net/)!")],
+            &[(1, "Click [here](http://example.net/)!")],
         );
     }
 
@@ -936,7 +936,7 @@ mod tests {
         assert_extract_messages(
             "Click [here]!\n\n\
              [here]: http://example.net/",
-            vec![(1, "Click [here](http://example.net/)!")],
+            &[(1, "Click [here](http://example.net/)!")],
         );
     }
 
@@ -944,7 +944,7 @@ mod tests {
     fn extract_messages_autolink() {
         assert_extract_messages(
             "Visit <http://example.net>!",
-            vec![(1, "Visit <http://example.net>!")],
+            &[(1, "Visit <http://example.net>!")],
         );
     }
 
@@ -952,7 +952,7 @@ mod tests {
     fn extract_messages_email() {
         assert_extract_messages(
             "Contact <info@example.net>!",
-            vec![(1, "Contact <info@example.net>!")],
+            &[(1, "Contact <info@example.net>!")],
         );
     }
 
@@ -963,7 +963,7 @@ mod tests {
         //
         // See `SourceMap::extract_messages` for a more complex
         // approach which can work around this in some cases.
-        assert_extract_messages("[foo][unknown]", vec![(1, r"\[foo\]\[unknown\]")]);
+        assert_extract_messages("[foo][unknown]", &[(1, r"\[foo\]\[unknown\]")]);
     }
 
     #[test]
@@ -974,7 +974,7 @@ The document[^1] text.
 
 [^1]: The footnote text.
 ",
-            vec![
+            &[
                 (2, "The document[^1] text."), //
                 (4, "The footnote text."),
             ],
@@ -984,15 +984,15 @@ The document[^1] text.
     #[test]
     fn extract_messages_block_quote() {
         assert_extract_messages(
-            r#"One of my favorite quotes is:
+            r"One of my favorite quotes is:
 
 > Don't believe everything you read on the Internet.
 >
 > I didn't say this second part, but I needed a paragraph for testing.
 
 --Abraham Lincoln
-"#,
-            vec![
+",
+            &[
                 (1, "One of my favorite quotes is:"),
                 (3, "Don't believe everything you read on the Internet."),
                 (
@@ -1014,7 +1014,7 @@ The document[^1] text.
         ";
         assert_extract_messages(
             input,
-            vec![
+            &[
                 (1, "Module Type"),
                 (1, "Description"),
                 (3, "`rust_binary`"),
@@ -1029,7 +1029,7 @@ The document[^1] text.
     fn extract_messages_code_block() {
         assert_extract_messages(
             "Preamble\n```rust\n// Example:\nfn hello() {\n  some_code()\n\n  todo!()\n}\n```\nPostamble",
-            vec![
+            &[
                 (1, "Preamble"),
                 (
                     3,
@@ -1050,7 +1050,7 @@ The document[^1] text.
              \"Second\" block\n\
              ```\n\
              ",
-            vec![
+            &[
                 (1, "```\n\"First\" block\n```"), //
                 (4, "```\n\"Second\" block\n```"),
             ],
@@ -1071,7 +1071,7 @@ The document[^1] text.
             > }\n\
             > ```\n\
             > Postamble",
-            vec![
+            &[
                 (1, "Preamble"),
                 (6, "// FIXME: do something here!\n"),
                 (10, "Postamble"),
@@ -1091,7 +1091,7 @@ The document[^1] text.
              * \n\
              * */\n\
             ```\n",
-            vec![(
+            &[(
                 2,
                 "/* block comment\n* /* nested block comment\n* */\n* \n* \n* \n* */",
             )],
@@ -1113,7 +1113,7 @@ The document[^1] text.
     let b = 1; // single line comment
 }
 ```",
-            vec![
+            &[
                 (2, "// continuous\n// line\n// comments\n"),
                 (6, "// continuous\n    // line\n    // comments\n"),
                 (9, "// single line comment\n"),
@@ -1139,7 +1139,7 @@ HTML -->
 ```ruby
 # Ruby
 ```"#,
-            vec![
+            &[
                 (2, "// C\n'C'"),
                 (3, "\"C\""),
                 (6, "<!-- HTML\nHTML -->"),
@@ -1159,7 +1159,7 @@ HTML -->
              </details>\n\
              \n\
              Postamble",
-            vec![
+            &[
                 (1, "Preamble"), //
                 // Missing "Some Details"
                 (6, "Postamble"),
@@ -1177,7 +1177,7 @@ HTML -->
              </details>\n\
              \n\
              Postamble",
-            vec![
+            &[
                 (1, "Preamble"), //
                 (5, "Some Details"),
                 (9, "Postamble"),
@@ -1189,7 +1189,7 @@ HTML -->
     fn extract_messages_list() {
         assert_extract_messages(
             "Some text\n * List item 1🦀\n * List item 2\n\nMore text",
-            vec![
+            &[
                 (1, "Some text"), //
                 (2, "List item 1🦀"),
                 (3, "List item 2"),
@@ -1202,7 +1202,7 @@ HTML -->
     fn extract_messages_multilevel_list() {
         assert_extract_messages(
             "Some text\n * List item 1\n * List item 2\n    * Sublist 1\n    * Sublist 2\n\nMore text",
-            vec![
+            &[
                 (1, "Some text"), //
                 (2, "List item 1"),
                 (3, "List item 2"),
@@ -1216,14 +1216,14 @@ HTML -->
     #[test]
     fn extract_messages_list_with_paragraphs() {
         assert_extract_messages(
-            r#"* Item 1.
+            r"* Item 1.
 * Item 2,
   two lines.
 
   * Sub 1.
   * Sub 2.
-"#,
-            vec![
+",
+            &[
                 (1, "Item 1."),
                 (2, "Item 2, two lines."),
                 (5, "Sub 1."),
@@ -1235,15 +1235,15 @@ HTML -->
     #[test]
     fn extract_messages_headings() {
         assert_extract_messages(
-            r#"Some text
+            r"Some text
 # Headline News🦀
 
 * A
 * List
 
 ## Subheading
-"#,
-            vec![
+",
+            &[
                 (1, "Some text"),
                 (2, "Headline News🦀"),
                 (4, "A"),
@@ -1258,7 +1258,7 @@ HTML -->
         // This is a regression test for an error that would
         // incorrectly combine CodeBlock and HTML.
         assert_extract_messages(
-            r#"```bob
+            r"```bob
 // BOB
 ```
 
@@ -1267,8 +1267,8 @@ HTML -->
 * Blah blah
 
 </details>
-"#,
-            vec![
+",
+            &[
                 (1, "```bob\n// BOB\n```"), //
                 (7, "Blah blah"),
             ],
@@ -1289,8 +1289,8 @@ $$
 \sum_{n=1}^{\infty} 2^{-n} = 1
 $$
 ",
-            vec![(2, r"$$ \\sum\_{n=1}^{\infty} 2^{-n} = 1 $$")],
-        )
+            &[(2, r"$$ \\sum\_{n=1}^{\infty} 2^{-n} = 1 $$")],
+        );
     }
 
     #[test]
@@ -1335,42 +1335,42 @@ $$
     #[test]
     fn extract_messages_skip_simple() {
         assert_extract_messages(
-            r#"<!-- mdbook-xgettext:skip -->
+            r"<!-- mdbook-xgettext:skip -->
 
-This is a paragraph."#,
-            vec![],
+This is a paragraph.",
+            &[],
         );
     }
 
     #[test]
     fn extract_messages_skip_next_paragraph_ok() {
         assert_extract_messages(
-            r#"<!-- mdbook-xgettext:skip -->
+            r"<!-- mdbook-xgettext:skip -->
 This is a paragraph.
 
 This should be translated.
-"#,
-            vec![(4, "This should be translated.")],
+",
+            &[(4, "This should be translated.")],
         );
     }
 
     #[test]
     fn extract_messages_skip_next_codeblock() {
         assert_extract_messages(
-            r#"<!-- mdbook-xgettext:skip -->
+            r"<!-- mdbook-xgettext:skip -->
 ```
 def f(x): return x * x
 ```
 This should be translated.
-"#,
-            vec![(5, "This should be translated.")],
+",
+            &[(5, "This should be translated.")],
         );
     }
 
     #[test]
     fn extract_messages_skip_back_to_back() {
         assert_extract_messages(
-            r#"<!-- mdbook-xgettext:skip -->
+            r"<!-- mdbook-xgettext:skip -->
 ```
 def f(x): return x * x
 ```
@@ -1378,8 +1378,8 @@ def f(x): return x * x
 This should not translated.
 
 But *this* should!
-"#,
-            vec![(8, "But _this_ should!")],
+",
+            &[(8, "But _this_ should!")],
         );
     }
 
@@ -1391,7 +1391,7 @@ this should be translated <!-- mdbook-xgettext:skip --> but not this.
 ... nor this.
 
 But *this* should!",
-            vec![(2, "this should be translated "), (5, "But _this_ should!")],
+            &[(2, "this should be translated "), (5, "But _this_ should!")],
         );
     }
 
@@ -1404,7 +1404,7 @@ But *this* should!",
 * B
 * C
 ",
-            vec![(2, "A"), (5, "C")],
+            &[(2, "A"), (5, "C")],
         );
     }
 
@@ -1419,7 +1419,7 @@ But *this* should!",
 
 * C
 ",
-            vec![(2, "A"), (7, "C")],
+            &[(2, "A"), (7, "C")],
         );
     }
 
@@ -1439,7 +1439,7 @@ But *this* should!",
 * <!-- mdbook-xgettext:skip --> B
 * C
 ",
-            vec![(2, "A")],
+            &[(2, "A")],
         );
     }
 
@@ -1450,20 +1450,20 @@ But *this* should!",
 still skipped
 
 not-skipped",
-            vec![(1, "foo "), (4, "not-skipped")],
+            &[(1, "foo "), (4, "not-skipped")],
         );
     }
 
     #[test]
     fn extract_messages_automatic_skipping_nontranslatable_codeblocks_simple() {
         assert_extract_messages(
-            r#"
+            r"
 ```python
 def g(x):
   this_should_be_skipped_no_strings_or_comments()
 ```
-"#,
-            vec![],
+",
+            &[],
         );
     }
 
@@ -1482,7 +1482,7 @@ def g(x):
   but_this_should_not()
 ```
 "#,
-            vec![(4, "\"this should be translated\"")],
+            &[(4, "\"this should be translated\"")],
         );
     }
 
@@ -1501,7 +1501,7 @@ def g(x):
   but_this_should_not()
 ```
 "#,
-            vec![(
+            &[(
                 2,
                 "```\ndef f(x):\n  print(\"this should be translated\")\n```",
             )],
