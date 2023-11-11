@@ -22,7 +22,7 @@
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
-use mdbook_i18n_helpers::{extract_events, extract_messages, reconstruct_markdown};
+use mdbook_i18n_helpers::{extract_events, extract_messages, reconstruct_markdown, wrap_sources};
 use polib::catalog::Catalog;
 use polib::message::Message;
 use polib::metadata::CatalogMetadata;
@@ -44,11 +44,8 @@ fn strip_link(text: &str) -> String {
 }
 
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
-    let wrap_options = textwrap::Options::new(76)
-        .break_words(false)
-        .word_splitter(textwrap::WordSplitter::NoHyphenation);
     let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => textwrap::refill(&format!("{}\n{}", msg.source(), source), wrap_options),
+        Some(msg) => wrap_sources(&format!("{}\n{}", msg.source(), source)),
         None => String::from(source),
     };
     let message = Message::build_singular()
