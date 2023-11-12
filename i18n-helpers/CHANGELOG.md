@@ -10,7 +10,7 @@ improves the experience when translating books with many code samples. We will
 add [more controls][#76] for this in the future.
 
 > This is a breaking change: if you translate strings and comments in your code
-> blocks, then you should [run `mdbook-i18n-normalize`](i18n-helpers/USAGE.md)
+> blocks, then you should [run `mdbook-i18n-normalize`](USAGE.md)
 > to migrate them automatically!
 
 - [#111]: Skip extracting whitespace-only messages.
@@ -39,7 +39,7 @@ add [more controls][#76] for this in the future.
 ## Version 0.2.0 (2023-08-15)
 
 > This is a breaking release. Please make sure to
-> [run `mdbook-i18n-normalize` on your existing PO files](i18n-helpers/USAGE.md)!
+> [run `mdbook-i18n-normalize` on your existing PO files](USAGE.md)!
 
 - [#49]: Link to other projects which use mdbook-i18n-helpers.
 - [#46]: Add `mdbook-i18n-normalize` to convert existing PO files.
