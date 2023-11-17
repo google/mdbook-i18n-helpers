@@ -33,6 +33,7 @@ use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
 pub mod directives;
 pub mod gettext;
 pub mod normalize;
+pub mod xgettext;
 
 /// Re-wrap the sources field of a message.
 ///
