@@ -39,3 +39,9 @@ name = "gettext"
 path = "fuzz_targets/gettext.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "xgettext"
+path = "fuzz_targets/xgettext.rs"
+test = false
+doc = false
