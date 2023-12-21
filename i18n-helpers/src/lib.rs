@@ -519,10 +519,11 @@ pub fn reconstruct_markdown(
     group: &[(usize, Event)],
     state: Option<State<'static>>,
 ) -> (String, State<'static>) {
+    let code_block_token_count = check_code_block_token_count(group);
     let events = group.iter().map(|(_, event)| event);
     let mut markdown = String::new();
     let options = Options {
-        code_block_token_count: 3,
+        code_block_token_count,
         list_token: '-',
         emphasis_token: '_',
         strong_token: "**",
@@ -554,6 +555,39 @@ pub fn reconstruct_markdown(
     // can safely trim this here since we know that we always
     // reconstruct Markdown for a self-contained group of events.
     (String::from(markdown.trim_start_matches('\n')), new_state)
+}
+
+/// Check appropriate codeblock token count
+fn check_code_block_token_count(group: &[(usize, Event)]) -> usize {
+    let events = group.iter().map(|(_, event)| event);
+    let mut in_codeblock = false;
+    let mut max_token_count = 0;
+    for event in events {
+        match event {
+            Event::Start(Tag::CodeBlock(_)) => in_codeblock = true,
+            Event::End(Tag::CodeBlock(_)) => in_codeblock = false,
+            Event::Text(x) if in_codeblock => {
+                let mut token_count = 0;
+                for c in x.chars() {
+                    if c == '`' {
+                        token_count += 1;
+                    } else {
+                        max_token_count = std::cmp::max(max_token_count, token_count);
+                        token_count = 0;
+                    }
+                }
+                max_token_count = std::cmp::max(max_token_count, token_count);
+            }
+            _ => (),
+        }
+    }
+    if max_token_count < 3 {
+        // default code block token is "```" which is 3
+        3
+    } else {
+        // If there is "```" in codeblock, codeblock token should be extended.
+        max_token_count + 1
+    }
 }
 
 /// Extract translatable strings from `document`.
@@ -1481,6 +1515,20 @@ def g(x):
                 2,
                 "```\ndef f(x):\n  print(\"this should be translated\")\n```",
             )],
+        );
+    }
+
+    #[test]
+    fn extract_messages_codeblock_in_codeblock() {
+        assert_extract_messages(
+            r#"
+````
+```
+// codeblock in codeblock
+```
+````
+"#,
+            &[(2, "````\n```\n// codeblock in codeblock\n```\n````")],
         );
     }
 }
