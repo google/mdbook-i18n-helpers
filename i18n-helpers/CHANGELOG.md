@@ -10,8 +10,8 @@ improves the experience when translating books with many code samples. We will
 add [more controls][#76] for this in the future.
 
 > This is a breaking change: if you translate strings and comments in your code
-> blocks, then you should [run `mdbook-i18n-normalize`](USAGE.md)
-> to migrate them automatically!
+> blocks, then you should [run `mdbook-i18n-normalize`](USAGE.md) to migrate
+> them automatically!
 
 - [#111]: Skip extracting whitespace-only messages.
 - [#109]: Extract only string literals and comments from code blocks.
