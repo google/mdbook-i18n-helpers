@@ -557,7 +557,11 @@ pub fn reconstruct_markdown(
     (String::from(markdown.trim_start_matches('\n')), new_state)
 }
 
-/// Check appropriate codeblock token count
+/// Check appropriate codeblock token count.
+///
+/// This is necessary to handle codeblocks inside codeblocks.
+/// See https://github.com/Byron/pulldown-cmark-to-cmark/issues/20
+/// for a related upstream issue.
 fn check_code_block_token_count(group: &[(usize, Event)]) -> usize {
     let events = group.iter().map(|(_, event)| event);
     let mut in_codeblock = false;
