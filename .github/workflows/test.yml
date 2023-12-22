@@ -105,7 +105,13 @@ jobs:
         run: |
           cd i18n-helpers
           cargo fuzz run gettext -- -only_ascii=1 -max_total_time=30
-          cargo fuzz cmin normalize
+          cargo fuzz cmin gettext
+
+      - name: Run xgettext fuzzer and minimize corpus
+        run: |
+          cd i18n-helpers
+          cargo fuzz run xgettext -- -only_ascii=1 -max_total_time=30
+          cargo fuzz cmin xgettext
 
   clippy:
     name: Clippy
