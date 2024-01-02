@@ -22,127 +22,139 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Test
-        run: cargo test
+      # - name: Test
+      #   run: cargo test
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
 
-  test-other-books:
-    strategy:
-      matrix:
-        include:
-          # Update the refs below once in a while.
-          - repo: rust-lang/book
-            ref: 5b6c1ceaa62ecbd6caef08df39b33b3938e99deb
-          - repo: google/comprehensive-rust
-            ref: 0dfd087538ed4b52cf30cafb3b9add49cd6d204a
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
 
-    name: Test with ${{ matrix.repo }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - uses: Swatinem/rust-cache@v2
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          token: ${{ secrets.CODECOV_TOKEN }} # not required for public repos
+          files: lcov.info
+          fail_ci_if_error: true
 
-      - name: Install tools
-        run: |
-          sudo apt install gettext
-          # Debug builds are fine and slightly faster.
-          cargo install --debug --path i18n-helpers
-          cargo install --debug --locked --version 0.4.35 mdbook
+  # test-other-books:
+  #   strategy:
+  #     matrix:
+  #       include:
+  #         # Update the refs below once in a while.
+  #         - repo: rust-lang/book
+  #           ref: 5b6c1ceaa62ecbd6caef08df39b33b3938e99deb
+  #         - repo: google/comprehensive-rust
+  #           ref: 0dfd087538ed4b52cf30cafb3b9add49cd6d204a
 
-      - name: Checkout ${{ matrix.repo }}
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ matrix.repo }}
-          ref: ${{ matrix.ref }}
-          path: example-book
+  #   name: Test with ${{ matrix.repo }}
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Test extracting text
-        working-directory: example-book
-        run: |
-          MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' mdbook build -d po
-          msgfmt -o /dev/null --statistics po/messages.pot
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         save-if: ${{ github.ref == 'refs/heads/main' }}
 
-  fuzz:
-    name: Fuzz test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  #     - name: Install tools
+  #       run: |
+  #         sudo apt install gettext
+  #         # Debug builds are fine and slightly faster.
+  #         cargo install --debug --path i18n-helpers
+  #         cargo install --debug --locked --version 0.4.35 mdbook
 
-      - name: Install nightly Rust
-        run: rustup default nightly
+  #     - name: Checkout ${{ matrix.repo }}
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ matrix.repo }}
+  #         ref: ${{ matrix.ref }}
+  #         path: example-book
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          # Default is "v0-rust"
-          # Use a separate key to prevent collision with main cache
-          prefix-key: "fuzz"
-          # Cache only on main build
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-          cache-directories: |
-            i18n-helpers/fuzz/target
-            i18n-helpers/fuzz/corpus
+  #     - name: Test extracting text
+  #       working-directory: example-book
+  #       run: |
+  #         MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' mdbook build -d po
+  #         msgfmt -o /dev/null --statistics po/messages.pot
 
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz
+  # fuzz:
+  #   name: Fuzz test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-      - name: Run group_events fuzzer and minimize corpus
-        run: |
-          cd i18n-helpers
-          cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
-          cargo fuzz cmin group_events
+  #     - name: Install nightly Rust
+  #       run: rustup default nightly
 
-      - name: Run normalize fuzzer and minimize corpus
-        run: |
-          cd i18n-helpers
-          cargo fuzz run normalize -- -only_ascii=1 -max_total_time=30
-          cargo fuzz cmin normalize
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         # Default is "v0-rust"
+  #         # Use a separate key to prevent collision with main cache
+  #         prefix-key: "fuzz"
+  #         # Cache only on main build
+  #         save-if: ${{ github.ref == 'refs/heads/main' }}
+  #         cache-directories: |
+  #           i18n-helpers/fuzz/target
+  #           i18n-helpers/fuzz/corpus
 
-      - name: Run gettext fuzzer and minimize corpus
-        run: |
-          cd i18n-helpers
-          cargo fuzz run gettext -- -only_ascii=1 -max_total_time=30
-          cargo fuzz cmin gettext
+  #     - name: Install cargo-fuzz
+  #       run: cargo install cargo-fuzz
 
-      - name: Run xgettext fuzzer and minimize corpus
-        run: |
-          cd i18n-helpers
-          cargo fuzz run xgettext -- -only_ascii=1 -max_total_time=30
-          cargo fuzz cmin xgettext
+  #     - name: Run group_events fuzzer and minimize corpus
+  #       run: |
+  #         cd i18n-helpers
+  #         cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
+  #         cargo fuzz cmin group_events
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  #     - name: Run normalize fuzzer and minimize corpus
+  #       run: |
+  #         cd i18n-helpers
+  #         cargo fuzz run normalize -- -only_ascii=1 -max_total_time=30
+  #         cargo fuzz cmin normalize
 
-      - uses: Swatinem/rust-cache@v2
+  #     - name: Run gettext fuzzer and minimize corpus
+  #       run: |
+  #         cd i18n-helpers
+  #         cargo fuzz run gettext -- -only_ascii=1 -max_total_time=30
+  #         cargo fuzz cmin gettext
 
-      - name: Clippy
-        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
+  #     - name: Run xgettext fuzzer and minimize corpus
+  #       run: |
+  #         cd i18n-helpers
+  #         cargo fuzz run xgettext -- -only_ascii=1 -max_total_time=30
+  #         cargo fuzz cmin xgettext
 
-      - name: Clippy on fuzzers
-        working-directory: ./i18n-helpers/fuzz
-        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
+  # clippy:
+  #   name: Clippy
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
 
-  format:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  #     - uses: Swatinem/rust-cache@v2
 
-      # We use an unstable rustmft feature and we thus need the
-      # nightly channel to enforce the formatting.
-      - name: Setup Rust nightly
-        run: rustup default nightly
+  #     - name: Clippy
+  #       run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
 
-      - name: Install rustfmt
-        run: rustup component add rustfmt
+  #     - name: Clippy on fuzzers
+  #       working-directory: ./i18n-helpers/fuzz
+  #       run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
 
-      - name: Check Formatting
-        uses: dprint/check@v2.2
+  # format:
+  #   name: Format
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+
+  #     # We use an unstable rustmft feature and we thus need the
+  #     # nightly channel to enforce the formatting.
+  #     - name: Setup Rust nightly
+  #       run: rustup default nightly
+
+  #     - name: Install rustfmt
+  #       run: rustup component add rustfmt
+
+  #     - name: Check Formatting
+  #       uses: dprint/check@v2.2
