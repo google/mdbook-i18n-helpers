@@ -2,6 +2,12 @@
 
 This lists the most important changes between releases of mdbook-i18n-helpers.
 
+## Version 0.3.1 (2024-01-05)
+
+- [#129]: Fix nested codeblocks by @dalance.
+- [#121]: Wrap source lines in `mdbook-i18n-normalize` by @mgeisler.
+- [#128]: Define fuzzer for `xgettext` binary by @kdarkhan.
+
 ## Version 0.3.0 (2023-11-09)
 
 This release changes how code blocks are treated: we now only extract literal
@@ -50,6 +56,9 @@ add [more controls][#76] for this in the future.
 
 First release as a stand-alone crate.
 
+[#129]: https://github.com/google/mdbook-i18n-helpers/pull/129
+[#128]: https://github.com/google/mdbook-i18n-helpers/pull/128
+[#121]: https://github.com/google/mdbook-i18n-helpers/pull/121
 [#111]: https://github.com/google/mdbook-i18n-helpers/pull/111
 [#109]: https://github.com/google/mdbook-i18n-helpers/pull/109
 [#100]: https://github.com/google/mdbook-i18n-helpers/pull/100
