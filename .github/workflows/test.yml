@@ -31,9 +31,9 @@ jobs:
         include:
           # Update the refs below once in a while.
           - repo: rust-lang/book
-            ref: 5b6c1ceaa62ecbd6caef08df39b33b3938e99deb
+            ref: 71352deb20727b4dda9ebfe8182709d5bf17dfea
           - repo: google/comprehensive-rust
-            ref: 0dfd087538ed4b52cf30cafb3b9add49cd6d204a
+            ref: 981676d811927f1b50b7654ceb4cc3c10d7fe97b
 
     name: Test with ${{ matrix.repo }}
     runs-on: ubuntu-latest
