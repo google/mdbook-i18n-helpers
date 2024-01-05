@@ -10,7 +10,7 @@ repository = "https://github.com/google/mdbook-i18n-helpers"
 description = "Plugins for a mdbook translation workflow based on Gettext."
 
 [dependencies]
-anyhow = "1.0.68"
+anyhow = "1.0.79"
 chrono = { version = "0.4.31", default-features = false, features = ["alloc"] }
 mdbook = { version = "0.4.36", default-features = false }
 polib = "0.2.0"
