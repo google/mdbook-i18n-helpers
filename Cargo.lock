@@ -608,6 +608,7 @@ dependencies = [
  "pulldown-cmark-to-cmark",
  "regex",
  "semver",
+ "serde",
  "serde_json",
  "syntect",
  "tempfile",
