@@ -2,3 +2,9 @@
 members = ["i18n-helpers", "mdbook-tera-backend"]
 default-members = ["i18n-helpers"]
 resolver = "2"
+
+[workspace.dependencies]
+anyhow = "1.0.79"
+mdbook = { version = "0.4.36", default-features = false }
+serde_json = "1.0.111"
+tempfile = "3.9.0"
