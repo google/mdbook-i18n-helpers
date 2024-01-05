@@ -10,7 +10,7 @@ repository = "https://github.com/google/mdbook-i18n-helpers"
 description = "Plugin to extend mdbook with Tera templates and custom HTML components."
 
 [dependencies]
-anyhow = "1.0.75"
+anyhow = "1.0.79"
 mdbook = { version = "0.4.36", default-features = false }
 serde = "1.0"
 serde_json = "1.0.111"
