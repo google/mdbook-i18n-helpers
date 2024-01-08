@@ -22,8 +22,17 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Test
-        run: cargo test
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Run tests with Coverage report enabled
+        run: cargo llvm-cov test --all-features --workspace --codecov --output-path codecov-report.json
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: codecov-report.json
+          fail_ci_if_error: true
 
   test-other-books:
     strategy:
