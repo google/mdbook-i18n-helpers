@@ -2,6 +2,10 @@
 
 This lists the most important changes between releases of mdbook-i18n-helpers.
 
+## Version 0.3.2 (2024-01-15)
+
+- [#145]: Add support for rounding line numbers by @mgeisler.
+
 ## Version 0.3.1 (2024-01-05)
 
 - [#129]: Fix nested codeblocks by @dalance.
@@ -56,6 +60,7 @@ add [more controls][#76] for this in the future.
 
 First release as a stand-alone crate.
 
+[#145]: https://github.com/google/mdbook-i18n-helpers/pull/145
 [#129]: https://github.com/google/mdbook-i18n-helpers/pull/129
 [#128]: https://github.com/google/mdbook-i18n-helpers/pull/128
 [#121]: https://github.com/google/mdbook-i18n-helpers/pull/121
