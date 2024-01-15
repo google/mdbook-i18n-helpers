@@ -51,6 +51,31 @@ fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
     catalog.append_or_update(message);
 }
 
+/// Build a source line for a catalog message.
+///
+/// Use `granularity` to round `lineno`:
+///
+/// - Set `granularity` to `1` if you want no rounding.
+/// - Set `granularity` to `0` if you want to line number at all.
+/// - Set `granularity` to `n` if you want rounding down to the
+///   nearest multiple of `n`. As an example, if you set it to `10`,
+///   then you will get sources like `foo.md:1`, `foo.md:10`,
+///   `foo.md:20`, etc.
+///
+/// This can help reduce number of updates to your PO files.
+fn build_source<P: AsRef<path::Path>>(path: P, lineno: usize, granularity: usize) -> String {
+    let path = path.as_ref();
+    match granularity {
+        0 => format!("{}", path.display()),
+        1 => format!("{}:{}", path.display(), lineno),
+        _ => format!(
+            "{}:{}",
+            path.display(),
+            std::cmp::max(1, lineno - (lineno % granularity))
+        ),
+    }
+}
+
 /// Build catalog from RenderContext
 ///
 /// # Arguments
@@ -75,12 +100,28 @@ where
     metadata.content_transfer_encoding = String::from("8bit");
     let mut catalog = Catalog::new(metadata);
 
+    // The line number granularity: we default to 1, but it can be
+    // overridden as needed.
+    let granularity = match ctx
+        .config
+        .get_renderer("xgettext")
+        .and_then(|cfg| cfg.get("granularity"))
+    {
+        None => 1,
+        Some(value) => value
+            .as_integer()
+            .and_then(|i| (i >= 0).then_some(i as usize))
+            .ok_or_else(|| {
+                anyhow!("Expected an unsigned integer for output.xgettext.granularity")
+            })?,
+    };
+
     // First, add all chapter names and part titles from SUMMARY.md.
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
     let summary = summary_reader(ctx.root.join(&summary_path))
         .with_context(|| anyhow!("Failed to read {}", summary_path.display()))?;
     for (lineno, msgid) in extract_messages(&summary) {
-        let source = format!("{}:{}", summary_path.display(), lineno);
+        let source = build_source(&summary_path, lineno, granularity);
         // The summary is mostly links like "[Foo *Bar*](foo-bar.md)".
         // We strip away the link to get "Foo *Bar*". The formatting
         // is stripped away by mdbook when it sends the book to
@@ -97,7 +138,7 @@ where
                 None => continue,
             };
             for (lineno, msgid) in extract_messages(&chapter.content) {
-                let source = format!("{}:{}", path.display(), lineno);
+                let source = build_source(&path, lineno, granularity);
                 add_message(&mut catalog, &msgid, &source);
             }
         }
@@ -143,6 +184,36 @@ mod tests {
     fn test_strip_link_with_formatting() {
         // The formatting is automatically normalized.
         assert_eq!(strip_link("[foo *bar* `baz`](foo.md)"), "foo _bar_ `baz`");
+    }
+
+    #[test]
+    fn test_build_source_granularity_zero() {
+        assert_eq!(build_source("foo.md", 0, 0), "foo.md");
+        assert_eq!(build_source("foo.md", 1, 0), "foo.md");
+        assert_eq!(build_source("foo.md", 9, 0), "foo.md");
+        assert_eq!(build_source("foo.md", 10, 0), "foo.md");
+        assert_eq!(build_source("foo.md", 11, 0), "foo.md");
+        assert_eq!(build_source("foo.md", 20, 0), "foo.md");
+    }
+
+    #[test]
+    fn test_build_source_granularity_one() {
+        assert_eq!(build_source("foo.md", 0, 1), "foo.md:0");
+        assert_eq!(build_source("foo.md", 1, 1), "foo.md:1");
+        assert_eq!(build_source("foo.md", 9, 1), "foo.md:9");
+        assert_eq!(build_source("foo.md", 10, 1), "foo.md:10");
+        assert_eq!(build_source("foo.md", 11, 1), "foo.md:11");
+        assert_eq!(build_source("foo.md", 20, 1), "foo.md:20");
+    }
+
+    #[test]
+    fn test_build_source_granularity_ten() {
+        assert_eq!(build_source("foo.md", 0, 10), "foo.md:1");
+        assert_eq!(build_source("foo.md", 1, 10), "foo.md:1");
+        assert_eq!(build_source("foo.md", 9, 10), "foo.md:1");
+        assert_eq!(build_source("foo.md", 10, 10), "foo.md:10");
+        assert_eq!(build_source("foo.md", 11, 10), "foo.md:10");
+        assert_eq!(build_source("foo.md", 20, 10), "foo.md:20");
     }
 
     #[test]
@@ -282,6 +353,47 @@ mod tests {
                 .map(|msg| (msg.source(), msg.msgid()))
                 .collect::<Vec<_>>(),
             &[("src/SUMMARY.md:1 src/foo.md:1 src/foo.md:3", "Foo"),]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_lineno_granularity() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 granularity = 5",
+            ),
+            ("src/SUMMARY.md", "- [Foo](foo.md)"),
+            (
+                "src/foo.md",
+                "- Line 1\n\
+                 \n\
+                 - Line 3\n\
+                 \n\
+                 - Line 5\n\
+                 \n\
+                 - Line 7\n\
+                 ",
+            ),
+        ])?;
+
+        let catalog = create_catalog(&ctx, std::fs::read_to_string)?;
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid()))
+                .collect::<Vec<_>>(),
+            &[
+                ("src/SUMMARY.md:1", "Foo"),
+                ("src/foo.md:1", "Line 1"),
+                ("src/foo.md:1", "Line 3"),
+                ("src/foo.md:5", "Line 5"),
+                ("src/foo.md:5", "Line 7"),
+            ]
         );
 
         Ok(())

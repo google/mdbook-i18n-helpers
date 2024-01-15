@@ -20,6 +20,20 @@ $ cargo install mdbook-i18n-helpers
 
 Please see [USAGE](USAGE.md) for how to translate your `mdbook` project.
 
+## Configuration
+
+You can customize the plugins in your `book.toml` file.
+
+### `mdbook-xgettext`
+
+- `output.xgettext.pot-file` (no default, required): Set this to the path of
+  your POT file. A typical value is `messages.pot`, see examples in
+  [USAGE](USAGE.md).
+- `output.xgettext.granularity` (default: `1`): Set this to _n_ to round all
+  line numbers down to the nearest multiple of _n_. Set this to `0` to remove
+  line numbers completely from the PO file. This can help reduce churn in your
+  PO files when messages edited.
+
 ## Changelog
 
 Please see the [CHANGELOG](CHANGELOG.md) for details on the major changes in
