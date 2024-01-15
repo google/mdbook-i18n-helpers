@@ -53,10 +53,8 @@ fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
 
 /// Build catalog from RenderContext
 ///
-/// # Arguments
-
-/// * `ctx` - RenderContext from mdbook library
-/// * `summary_reader` - A closure which reads summary at given path
+/// The `summary_reader` is used to read the `SUMMARY.md` file at
+/// given path.
 pub fn create_catalog<F>(ctx: &RenderContext, summary_reader: F) -> anyhow::Result<Catalog>
 where
     F: Fn(path::PathBuf) -> io::Result<String>,
