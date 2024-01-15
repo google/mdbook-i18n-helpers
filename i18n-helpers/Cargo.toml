@@ -1,6 +1,6 @@
 [package]
 name = "mdbook-i18n-helpers"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Martin Geisler <mgeisler@google.com>"]
 categories = ["command-line-utilities", "localization"]
 edition = "2021"
