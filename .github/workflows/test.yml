@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
   FORCE_COLOR: 3
 
 jobs:
@@ -100,20 +101,20 @@ jobs:
         run: cargo install cargo-fuzz
 
       - name: Run group_events fuzzer and minimize corpus
+        working-directory: i18n-helpers
         run: |
-          cd i18n-helpers
           cargo fuzz run group_events -- -only_ascii=1 -max_total_time=30
           cargo fuzz cmin group_events
 
       - name: Run normalize fuzzer and minimize corpus
+        working-directory: i18n-helpers
         run: |
-          cd i18n-helpers
           cargo fuzz run normalize -- -only_ascii=1 -max_total_time=30
           cargo fuzz cmin normalize
 
       - name: Run gettext fuzzer and minimize corpus
+        working-directory: i18n-helpers
         run: |
-          cd i18n-helpers
           cargo fuzz run gettext -- -only_ascii=1 -max_total_time=30
           cargo fuzz cmin gettext
 
@@ -133,11 +134,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clippy
-        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
+        run: cargo clippy --all-targets
 
       - name: Clippy on fuzzers
         working-directory: ./i18n-helpers/fuzz
-        run: cargo clippy -- -D clippy::dbg_macro -D clippy::print_stdout -D clippy::print_stderr -D clippy::all
+        run: cargo clippy --all-targets
 
   format:
     name: Format
