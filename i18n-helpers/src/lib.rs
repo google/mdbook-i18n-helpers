@@ -396,7 +396,9 @@ fn heuristic_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
 /// Creates groups by parsing codeblock.
 fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
     // Language detection from language identifier of codeblock.
-    let ss = SyntaxSet::load_defaults_newlines();
+    static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
+    let ss = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
+
     let syntax = if let (_, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(x)))) = &events[0] {
         ss.find_syntax_by_token(x.split(',').next().unwrap())
     } else {
@@ -417,7 +419,7 @@ fn parse_codeblock<'a>(events: &'a [(usize, Event)]) -> Vec<Group<'a>> {
                 let mut stack = ScopeStack::new();
                 let mut stack_failure = false;
 
-                let Ok(ops) = ps.parse_line(text, &ss) else {
+                let Ok(ops) = ps.parse_line(text, ss) else {
                     // If parse is failed, the text event should be translated.
                     ret.push(Group::Translate(events[idx..idx + 1].into()));
                     continue;
