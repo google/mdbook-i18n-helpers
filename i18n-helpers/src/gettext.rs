@@ -313,4 +313,23 @@ mod tests {
             "# FOO {#id .foo}"
         );
     }
+
+    #[test]
+    fn test_backquote_in_codeblock() {
+        let catalog = create_catalog(&[]);
+        assert_eq!(
+            translate(
+                "\
+                ````d\n\
+                ```\n\
+                ````\n\
+                ",
+                &catalog
+            ),
+            "\
+            ````d\n\
+            ```\n\
+            ````",
+        );
+    }
 }
