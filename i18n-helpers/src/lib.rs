@@ -569,23 +569,32 @@ fn check_code_block_token_count(group: &[(usize, Event)]) -> usize {
     let events = group.iter().map(|(_, event)| event);
     let mut in_codeblock = false;
     let mut max_token_count = 0;
+
+    // token_count should be taken over Text events
+    // because a continuous text may be splitted to several Text events.
+    let mut token_count = 0;
+
     for event in events {
         match event {
-            Event::Start(Tag::CodeBlock(_)) => in_codeblock = true,
-            Event::End(Tag::CodeBlock(_)) => in_codeblock = false,
+            Event::Start(Tag::CodeBlock(_)) => {
+                in_codeblock = true;
+                token_count = 0;
+            }
+            Event::End(Tag::CodeBlock(_)) => {
+                in_codeblock = false;
+                token_count = 0;
+            }
             Event::Text(x) if in_codeblock => {
-                let mut token_count = 0;
                 for c in x.chars() {
                     if c == '`' {
                         token_count += 1;
-                    } else {
                         max_token_count = std::cmp::max(max_token_count, token_count);
+                    } else {
                         token_count = 0;
                     }
                 }
-                max_token_count = std::cmp::max(max_token_count, token_count);
             }
-            _ => (),
+            _ => token_count = 0,
         }
     }
     if max_token_count < 3 {
