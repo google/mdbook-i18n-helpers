@@ -404,4 +404,39 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_create_catalog_lineno_granularity_duplicates() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 granularity = 3",
+            ),
+            ("src/SUMMARY.md", "- [Foo](foo.md)"),
+            (
+                "src/foo.md",
+                "Bar\n\
+                 \n\
+                 Bar\n\
+                 \n\
+                 Bar\n",
+            ),
+        ])?;
+
+        let catalog = create_catalog(&ctx, std::fs::read_to_string)?;
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid()))
+                .collect::<Vec<_>>(),
+            &[
+                ("src/SUMMARY.md:1", "Foo"),
+                ("src/foo.md:1 src/foo.md:3", "Bar"),
+            ]
+        );
+
+        Ok(())
+    }
 }
