@@ -25,7 +25,9 @@
 
 use polib::catalog::Catalog;
 use pulldown_cmark::{CodeBlockKind, Event, LinkType, Tag};
-use pulldown_cmark_to_cmark::{cmark_resume_with_options, Options, State};
+use pulldown_cmark_to_cmark::{
+    calculate_code_block_token_count, cmark_resume_with_options, Options, State,
+};
 use std::sync::OnceLock;
 use syntect::easy::ScopeRangeIterator;
 use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
@@ -522,8 +524,8 @@ pub fn reconstruct_markdown(
     group: &[(usize, Event)],
     state: Option<State<'static>>,
 ) -> (String, State<'static>) {
-    let code_block_token_count = check_code_block_token_count(group);
     let events = group.iter().map(|(_, event)| event);
+    let code_block_token_count = calculate_code_block_token_count(events.clone()).unwrap_or(3);
     let mut markdown = String::new();
     let options = Options {
         code_block_token_count,
@@ -558,52 +560,6 @@ pub fn reconstruct_markdown(
     // can safely trim this here since we know that we always
     // reconstruct Markdown for a self-contained group of events.
     (String::from(markdown.trim_start_matches('\n')), new_state)
-}
-
-/// Check appropriate codeblock token count.
-///
-/// This is necessary to handle codeblocks inside codeblocks.
-/// See https://github.com/Byron/pulldown-cmark-to-cmark/issues/20
-/// for a related upstream issue.
-fn check_code_block_token_count(group: &[(usize, Event)]) -> usize {
-    let events = group.iter().map(|(_, event)| event);
-    let mut in_codeblock = false;
-    let mut max_token_count = 0;
-
-    // token_count should be taken over Text events
-    // because a continuous text may be splitted to several Text events.
-    let mut token_count = 0;
-
-    for event in events {
-        match event {
-            Event::Start(Tag::CodeBlock(_)) => {
-                in_codeblock = true;
-                token_count = 0;
-            }
-            Event::End(Tag::CodeBlock(_)) => {
-                in_codeblock = false;
-                token_count = 0;
-            }
-            Event::Text(x) if in_codeblock => {
-                for c in x.chars() {
-                    if c == '`' {
-                        token_count += 1;
-                        max_token_count = std::cmp::max(max_token_count, token_count);
-                    } else {
-                        token_count = 0;
-                    }
-                }
-            }
-            _ => token_count = 0,
-        }
-    }
-    if max_token_count < 3 {
-        // default code block token is "```" which is 3
-        3
-    } else {
-        // If there is "```" in codeblock, codeblock token should be extended.
-        max_token_count + 1
-    }
 }
 
 /// Extract translatable strings from `document`.
