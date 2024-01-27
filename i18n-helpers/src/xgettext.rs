@@ -41,7 +41,13 @@ fn strip_link(text: &str) -> String {
 
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
     let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => wrap_sources(&format!("{}\n{}", msg.source(), source)),
+        Some(msg) => {
+            if msg.source().contains(source) {
+                return;
+            }
+
+            wrap_sources(&format!("{}\n{}", msg.source(), source))
+        }
         None => String::from(source),
     };
     let message = Message::build_singular()
