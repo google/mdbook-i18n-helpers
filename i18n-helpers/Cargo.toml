@@ -14,7 +14,7 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
-chrono = { version = "0.4.31", default-features = false, features = ["alloc"] }
+chrono = { version = "0.4.33", default-features = false, features = ["alloc"] }
 mdbook.workspace = true
 polib = "0.2.0"
 pulldown-cmark = { version = "0.9.6", default-features = false }
