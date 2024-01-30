@@ -11,5 +11,5 @@ print_stderr = "warn"
 [workspace.dependencies]
 anyhow = "1.0.79"
 mdbook = { version = "0.4.36", default-features = false }
-serde_json = "1.0.111"
+serde_json = "1.0.113"
 tempfile = "3.9.0"
