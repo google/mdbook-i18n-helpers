@@ -29,12 +29,18 @@ jobs:
       - name: Run tests with Coverage report enabled
         run: cargo llvm-cov test --all-features --workspace --codecov --output-path codecov-report.json
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+      # This stores the coverage report in artifacts. The actual upload to Codecov
+      # is executed by a different workflow `coverage-report.yml`. The reason for this
+      # split is because `on.pull_request` workflows don't have access to secrets.
+      - name: Store coverage report in artifacts
+        uses: actions/upload-artifact@v3
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: codecov-report.json
-          fail_ci_if_error: true
+          name: codecov-report
+          path: codecov-report.json
+
+      - run: |
+          echo "The coverage report was stored in Github artifacts."
+          echo "It will be uploaded to Codecov using [coverage-report.yml] workflow shortly."
 
   test-other-books:
     strategy:
