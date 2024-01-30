@@ -33,7 +33,7 @@ jobs:
       # is executed by a different workflow `coverage-report.yml`. The reason for this
       # split is because `on.pull_request` workflows don't have access to secrets.
       - name: Store coverage report in artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: codecov-report
           path: codecov-report.json
