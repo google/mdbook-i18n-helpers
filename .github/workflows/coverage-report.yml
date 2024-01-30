@@ -1,0 +1,60 @@
+name: Coverage report
+
+on:
+  # This workflow is triggered after every successfull execution
+  # of `tests` workflow.
+  workflow_run:
+    workflows: ["tests"]
+    types:
+      - completed
+jobs:
+  coverage:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+
+      - name: 'Download existing coverage report'
+        id: prepare_report
+        uses: actions/github-script@v6
+        with:
+          script: |
+            var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: context.payload.workflow_run.id,
+            });
+
+            let matchedArtifact = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "codecov-report";
+            });
+
+            if (matchedArtifact && matchedArtifact[0]) {
+
+              var download = await github.rest.actions.downloadArtifact({
+                 owner: context.repo.owner,
+                 repo: context.repo.repo,
+                 artifact_id: matchedArtifact[0].id,
+                 archive_format: 'zip',
+              });
+              var fs = require('fs');
+              fs.writeFileSync('${{github.workspace}}/codecov-report.zip', Buffer.from(download.data));
+            } else {
+              console.error('No artifact found');
+            }
+
+      - run: unzip codecov-report.zip
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: codecov-report.json
+          fail_ci_if_error: true
+          # Manual overrides for these parameters are needed because automatic detection
+          # in codecov-action does not work for non-`pull_request` workflows.
+          override_commit: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+          override_pr: ${{ github.event.workflow_run.pull_requests[0].number }}
