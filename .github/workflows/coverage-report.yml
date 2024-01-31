@@ -22,6 +22,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            console.log('context.payload is');
+            console.log(JSON.stringify(context.payload, null, 2));
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
