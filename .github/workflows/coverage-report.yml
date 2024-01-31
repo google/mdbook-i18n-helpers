@@ -19,7 +19,7 @@ jobs:
 
       - name: 'Download existing coverage report'
         id: prepare_report
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
