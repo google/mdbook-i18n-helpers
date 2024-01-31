@@ -7,12 +7,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      minor:
+        update-types:
+          - minor
+      patch:
+        update-types:
+          - patch
 
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
-
     groups:
       minor:
         update-types:
