@@ -12,51 +12,98 @@ jobs:
     name: Coverage report
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
 
       - name: 'Download existing coverage report'
         id: prepare_report
         uses: actions/github-script@v7
         with:
           script: |
-            console.log('context.payload is');
-            console.log(JSON.stringify(context.payload, null, 2));
+            var fs = require('fs');
+
+            // List artifacts of the workflow run that triggered this workflow
             var artifacts = await github.rest.actions.listWorkflowRunArtifacts({
                owner: context.repo.owner,
                repo: context.repo.repo,
                run_id: context.payload.workflow_run.id,
             });
 
-            let matchedArtifact = artifacts.data.artifacts.filter((artifact) => {
-              return artifact.name == "codecov-report";
+            let codecovReport = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "codecov_report";
             });
 
-            if (matchedArtifact && matchedArtifact[0]) {
-
-              var download = await github.rest.actions.downloadArtifact({
-                 owner: context.repo.owner,
-                 repo: context.repo.repo,
-                 artifact_id: matchedArtifact[0].id,
-                 archive_format: 'zip',
-              });
-              var fs = require('fs');
-              fs.writeFileSync('${{github.workspace}}/codecov-report.zip', Buffer.from(download.data));
-            } else {
-              console.error('No artifact found');
+            if (codecovReport.length != 1) {
+              throw new Error("Unexpected number of {codecov_report} artifacts: " + codecovReport.length);
             }
 
-      - run: unzip codecov-report.zip
+            var download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: codecovReport[0].id,
+               archive_format: 'zip',
+            });
+            fs.writeFileSync('codecov_report.zip', Buffer.from(download.data));
+
+            let prNumber = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "pr_number";
+            });
+
+            if (prNumber.length != 1) {
+              throw new Error("Unexpected number of {pr_number} artifacts: " + prNumber.length);
+            }
+
+            var download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: prNumber[0].id,
+               archive_format: 'zip',
+            });
+            fs.writeFileSync('pr_number.zip', Buffer.from(download.data));
+
+            let commitSha = artifacts.data.artifacts.filter((artifact) => {
+              return artifact.name == "commit_sha";
+            });
+
+            if (commitSha.length != 1) {
+              throw new Error("Unexpected number of {commit_sha} artifacts: " + commitSha.length);
+            }
+
+            var download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: commitSha[0].id,
+               archive_format: 'zip',
+            });
+            fs.writeFileSync('commit_sha.zip', Buffer.from(download.data));
+
+      - id: parse_previous_artifacts
+        run: |
+          unzip codecov_report.zip
+          unzip pr_number.zip
+          unzip commit_sha.zip
+
+          echo "Detected PR is: $(<pr_number.txt)"
+          echo "Detected commit_sha is: $(<commit_sha.txt)"
+
+          # Make the params available as step output
+          echo "override_pr=$(<pr_number.txt)" >> "$GITHUB_OUTPUT"
+          echo "override_commit=$(<commit_sha.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.parse_previous_artifacts.outputs.override_commit || '' }}
+          path: repo_root
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: codecov-report.json
+          files: ${{ github.workspace }}/codecov_report.json
           fail_ci_if_error: true
           # Manual overrides for these parameters are needed because automatic detection
           # in codecov-action does not work for non-`pull_request` workflows.
-          override_commit: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
-          override_pr: ${{ github.event.workflow_run.pull_requests[0].number }}
+          # In `main` branch push, these default to empty strings since we want to run
+          # the analysis on HEAD.
+          override_commit: ${{ steps.parse_previous_artifacts.outputs.override_commit || '' }}
+          override_pr: ${{ steps.parse_previous_artifacts.outputs.override_pr || '' }}
+          root_dir: ${{ github.workspace }}/repo_root
