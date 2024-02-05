@@ -9,7 +9,7 @@ fuzz_target!(|text: String| {
     let flattened_groups = group_events(&events)
         .into_iter()
         .flat_map(|group| match group {
-            Group::Translate(events, _) | Group::Skip(events) => events,
+            Group::Translate { events, .. } | Group::Skip(events) => events,
         })
         .collect::<Vec<_>>();
 

@@ -151,19 +151,17 @@ pub enum Group<'a> {
     ///
     /// This includes `[Text("foo")]` as well as sequences with text
     /// such as `[Start(Emphasis), Text("foo") End(Emphasis)]`.
-    Translate(Vec<(usize, Event<'a>)>, TranslateMetadata),
+    Translate {
+        events: Vec<(usize, Event<'a>)>,
+        /// A comment that may be associated with the translation text.
+        comment: String,
+    },
 
     /// Markdown events which should be skipped when translating.
     ///
     /// This includes structural events such as `Start(Heading(H1,
     /// None, vec![]))`.
     Skip(Vec<(usize, Event<'a>)>),
-}
-
-/// Store some extra information for a translation group.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct TranslateMetadata {
-    pub comments: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -190,7 +188,7 @@ impl GroupingContext {
 /// # Examples
 ///
 /// ```
-/// use mdbook_i18n_helpers::{extract_events, group_events, Group, TranslateMetadata};
+/// use mdbook_i18n_helpers::{extract_events, group_events, Group};
 /// use pulldown_cmark::{Event, Tag};
 ///
 /// let events = extract_events("- A list item.", None);
@@ -213,9 +211,10 @@ impl GroupingContext {
 ///             (1, Event::Start(Tag::List(None))),
 ///             (1, Event::Start(Tag::Item)),
 ///         ]),
-///         Group::Translate(vec![
-///             (1, Event::Text("A list item.".into())),
-///         ], TranslateMetadata::default()),
+///         Group::Translate {
+///             events: vec![
+///                 (1, Event::Text("A list item.".into())),
+///             ], comment: "".into()},
 ///         Group::Skip(vec![
 ///             (1, Event::End(Tag::Item)),
 ///             (1, Event::End(Tag::List(None))),
@@ -249,12 +248,10 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                         parse_codeblock(&events[start..idx], ctx)
                     } else {
                         (
-                            vec![Group::Translate(
-                                events[start..idx].into(),
-                                TranslateMetadata {
-                                    comments: std::mem::take(&mut ctx.comments),
-                                },
-                            )],
+                            vec![Group::Translate {
+                                events: events[start..idx].into(),
+                                comment: std::mem::take(&mut ctx.comments).join(" "),
+                            }],
                             ctx,
                         )
                     }
@@ -375,10 +372,10 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
     }
 
     match state {
-        State::Translate(start) => groups.push(Group::Translate(
-            events[start..].into(),
-            TranslateMetadata::default(),
-        )),
+        State::Translate(start) => groups.push(Group::Translate {
+            events: events[start..].into(),
+            comment: "".into(),
+        }),
         State::Skip(start) => groups.push(Group::Skip(events[start..].into())),
     }
 
@@ -425,12 +422,10 @@ fn heuristic_codeblock<'a>(
 
     if is_translate {
         (
-            vec![Group::Translate(
-                events.into(),
-                TranslateMetadata {
-                    comments: std::mem::take(&mut ctx.comments),
-                },
-            )],
+            vec![Group::Translate {
+                events: events.into(),
+                comment: std::mem::take(&mut ctx.comments).join(" "),
+            }],
             ctx,
         )
     } else {
@@ -469,12 +464,10 @@ fn parse_codeblock<'a>(
 
                 let Ok(ops) = ps.parse_line(text, ss) else {
                     // If parse is failed, the text event should be translated.
-                    ret.push(Group::Translate(
-                        events[idx..idx + 1].into(),
-                        TranslateMetadata {
-                            comments: std::mem::take(&mut ctx.comments),
-                        },
-                    ));
+                    ret.push(Group::Translate {
+                        events: events[idx..idx + 1].into(),
+                        comment: std::mem::take(&mut ctx.comments).join(" "),
+                    });
                     continue;
                 };
 
@@ -513,12 +506,10 @@ fn parse_codeblock<'a>(
                     } else {
                         let whitespace_events = extract_trailing_whitespaces(&mut translate_events);
                         if !translate_events.is_empty() {
-                            groups.push(Group::Translate(
-                                std::mem::take(&mut translate_events),
-                                TranslateMetadata {
-                                    comments: std::mem::take(&mut ctx.comments),
-                                },
-                            ));
+                            groups.push(Group::Translate {
+                                events: std::mem::take(&mut translate_events),
+                                comment: std::mem::take(&mut ctx.comments).join(" "),
+                            });
                         }
                         if !whitespace_events.is_empty() {
                             groups.push(Group::Skip(whitespace_events));
@@ -529,12 +520,10 @@ fn parse_codeblock<'a>(
 
                 let whitespace_events = extract_trailing_whitespaces(&mut translate_events);
                 if !translate_events.is_empty() {
-                    groups.push(Group::Translate(
-                        std::mem::take(&mut translate_events),
-                        TranslateMetadata {
-                            comments: std::mem::take(&mut ctx.comments),
-                        },
-                    ));
+                    groups.push(Group::Translate {
+                        events: std::mem::take(&mut translate_events),
+                        comment: std::mem::take(&mut ctx.comments).join(" "),
+                    });
                 }
                 if !whitespace_events.is_empty() {
                     groups.push(Group::Skip(whitespace_events));
@@ -542,12 +531,10 @@ fn parse_codeblock<'a>(
 
                 if stack_failure {
                     // If stack operation is failed, the text event should be translated.
-                    ret.push(Group::Translate(
-                        events[idx..idx + 1].into(),
-                        TranslateMetadata {
-                            comments: std::mem::take(&mut ctx.comments),
-                        },
-                    ));
+                    ret.push(Group::Translate {
+                        events: events[idx..idx + 1].into(),
+                        comment: std::mem::take(&mut ctx.comments).join(" "),
+                    });
                 } else {
                     ret.append(&mut groups);
                 }
@@ -704,7 +691,7 @@ pub fn extract_messages(document: &str) -> Vec<(usize, ExtractedMessage)> {
 
     for group in group_events(&events) {
         match group {
-            Group::Translate(events, group_extra) => {
+            Group::Translate { events, comment } => {
                 if let Some((lineno, _)) = events.first() {
                     let (text, new_state) = reconstruct_markdown(&events, state);
                     // Skip empty messages since they are special:
@@ -714,7 +701,7 @@ pub fn extract_messages(document: &str) -> Vec<(usize, ExtractedMessage)> {
                             *lineno,
                             ExtractedMessage {
                                 message: text,
-                                comment: group_extra.comments.join(" "),
+                                comment,
                             },
                         ));
                     }
@@ -784,7 +771,7 @@ pub fn translate_events<'a>(
 
     for group in group_events(events) {
         match group {
-            Group::Translate(events, _) => {
+            Group::Translate { events, .. } => {
                 // Reconstruct the message.
                 let (msgid, new_state) = reconstruct_markdown(&events, state.clone());
                 let translated = catalog
