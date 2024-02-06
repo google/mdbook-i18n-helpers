@@ -7,46 +7,41 @@ publish = false
 [package.metadata]
 cargo-fuzz = true
 
-[lints.clippy]
-dbg_macro = "warn"
-print_stdout = "warn"
-print_stderr = "warn"
+[lints]
+workspace = true
 
 [dependencies]
 arbitrary = { version = "1.3.1", features = ["derive"] }
 libfuzzer-sys = "0.4.0"
-mdbook = { version = "0.4.25", default-features = false }
-mdbook-i18n-helpers = { path = ".." }
-polib = "0.2.0"
-pretty_assertions = "1.3.0"
-
-# Prevent this from interfering with workspaces
-[workspace]
-members = ["."]
-
-[profile.release]
-debug = 1
+mdbook.workspace = true
+mdbook-i18n-helpers = { path = "../i18n-helpers" }
+polib.workspace = true
+pretty_assertions.workspace = true
 
 [[bin]]
 name = "group_events"
 path = "fuzz_targets/group_events.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "normalize"
 path = "fuzz_targets/normalize.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "gettext"
 path = "fuzz_targets/gettext.rs"
 test = false
 doc = false
+bench = false
 
 [[bin]]
 name = "xgettext"
 path = "fuzz_targets/xgettext.rs"
 test = false
 doc = false
+bench = false
