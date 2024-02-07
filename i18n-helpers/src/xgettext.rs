@@ -21,7 +21,7 @@ use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
 use polib::catalog::Catalog;
-use polib::message::Message;
+use polib::message::{Message, MessageMutView, MessageView};
 use polib::metadata::CatalogMetadata;
 use pulldown_cmark::{Event, Tag};
 
@@ -41,13 +41,7 @@ fn strip_link(text: &str) -> String {
 
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
     let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => {
-            if msg.source().contains(source) {
-                return;
-            }
-
-            wrap_sources(&format!("{}\n{}", msg.source(), source))
-        }
+        Some(msg) => format!("{}\n{}", msg.source(), source),
         None => String::from(source),
     };
     let message = Message::build_singular()
@@ -79,6 +73,16 @@ fn build_source<P: AsRef<path::Path>>(path: P, lineno: usize, granularity: usize
             path.display(),
             std::cmp::max(1, lineno - (lineno % granularity))
         ),
+    }
+}
+
+fn dedup_sources(catalog: &mut Catalog) {
+    for mut message in catalog.messages_mut() {
+        let mut lines: Vec<&str> = message.source().lines().collect();
+        lines.dedup();
+
+        let wrapped_source = wrap_sources(&lines.join("\n"));
+        *message.source_mut() = wrapped_source;
     }
 }
 
@@ -149,6 +153,8 @@ where
             }
         }
     }
+
+    dedup_sources(&mut catalog);
 
     Ok(catalog)
 }
