@@ -21,7 +21,7 @@ use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::BookItem;
 use polib::catalog::Catalog;
-use polib::message::Message;
+use polib::message::{Message, MessageMutView, MessageView};
 use polib::metadata::CatalogMetadata;
 use pulldown_cmark::{Event, Tag};
 
@@ -41,7 +41,7 @@ fn strip_link(text: &str) -> String {
 
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str) {
     let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => wrap_sources(&format!("{}\n{}", msg.source(), source)),
+        Some(msg) => format!("{}\n{}", msg.source(), source),
         None => String::from(source),
     };
     let message = Message::build_singular()
@@ -73,6 +73,16 @@ fn build_source<P: AsRef<path::Path>>(path: P, lineno: usize, granularity: usize
             path.display(),
             std::cmp::max(1, lineno - (lineno % granularity))
         ),
+    }
+}
+
+fn dedup_sources(catalog: &mut Catalog) {
+    for mut message in catalog.messages_mut() {
+        let mut lines: Vec<&str> = message.source().lines().collect();
+        lines.dedup();
+
+        let wrapped_source = wrap_sources(&lines.join("\n"));
+        *message.source_mut() = wrapped_source;
     }
 }
 
@@ -143,6 +153,8 @@ where
             }
         }
     }
+
+    dedup_sources(&mut catalog);
 
     Ok(catalog)
 }
@@ -393,6 +405,41 @@ mod tests {
                 ("src/foo.md:1", "Line 3"),
                 ("src/foo.md:5", "Line 5"),
                 ("src/foo.md:5", "Line 7"),
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_lineno_granularity_duplicates() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 granularity = 3",
+            ),
+            ("src/SUMMARY.md", "- [Foo](foo.md)"),
+            (
+                "src/foo.md",
+                "Bar\n\
+                 \n\
+                 Bar\n\
+                 \n\
+                 Bar\n",
+            ),
+        ])?;
+
+        let catalog = create_catalog(&ctx, std::fs::read_to_string)?;
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid()))
+                .collect::<Vec<_>>(),
+            &[
+                ("src/SUMMARY.md:1", "Foo"),
+                ("src/foo.md:1 src/foo.md:3", "Bar"),
             ]
         );
 
