@@ -16,6 +16,14 @@ fn parse_source(source: &str) -> Option<(&str, usize)> {
     Some((path, lineno.parse().ok()?))
 }
 
+/// Use only the potion of extract_messages that the normalizer cares about.
+fn extract_document_messages(doc: &str) -> Vec<(usize, String)> {
+    extract_messages(doc)
+        .into_iter()
+        .map(|(idx, extracted)| (idx, extracted.message))
+        .collect()
+}
+
 fn compute_source(source: &str, delta: usize) -> String {
     let mut new_source = String::with_capacity(source.len());
 
@@ -110,7 +118,7 @@ impl<'a> SourceMap<'a> {
         // link should be defined.
         let document = field.project(message.msgid(), message.msgstr()?);
         if !has_broken_link(document) {
-            return Ok(extract_messages(document));
+            return Ok(extract_document_messages(document));
         }
 
         // If `parse_source` fails, then `message` has more than one
@@ -118,7 +126,7 @@ impl<'a> SourceMap<'a> {
         // case since it is unclear which link definition to use.
         let path = match parse_source(message.source()) {
             Some((path, _)) => path,
-            None => return Ok(extract_messages(document)),
+            None => return Ok(extract_document_messages(document)),
         };
 
         // First, we try constructing a document using other messages
@@ -149,7 +157,7 @@ impl<'a> SourceMap<'a> {
             let _ = file.read_to_string(&mut full_document);
         }
 
-        let mut messages = extract_messages(&full_document);
+        let mut messages = extract_document_messages(&full_document);
         // Truncate away the messages from `full_document` which start
         // after `document`.
         let line_count = document.lines().count();
