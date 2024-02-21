@@ -182,10 +182,29 @@ Please see the [`publish.yml`] workflow in the Comprehensive Rust 🦀 repositor
 
 [`publish.yml`]: https://github.com/google/comprehensive-rust/blob/main/.github/workflows/publish.yml
 
+## Marking Sections with a comment
+
+A block can be marked with a comment for translation by prepending a special
+HTML comment `<!-- i18n:comment: XXX -->` in front of it. Consecutive HTML
+comments will be collected into a single translation comment.
+
+For example:
+
+```markdown
+The following will have a comment attached to the message.
+
+But what is a man,
+
+<!-- i18n:comment: ...a miserable little pile of secrets. -->
+<!-- i18n:comment: But enough talk! -->
+
+what has he got. If not himself, then he has naught.
+```
+
 ## Marking Sections to be Skipped for Translation
 
 A block can be marked to be skipped for translation by prepending a special HTML
-comment `<!-- i18n:skip -->` to it.
+comment `<!-- i18n:skip -->` in front of it.
 
 For example:
 
