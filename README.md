@@ -27,7 +27,7 @@ Please add your project below if it uses
 - [Dojo: The Provable Game Engine](https://book.dojoengine.org/)
 - [ezlog documentation](https://s1rius.github.io/ezlog/)
 - [The Cairo Programming Language](https://book.cairo-lang.org/)
-- [The Veryl Hardware Description Language](https://dalance.github.io/veryl/book/)
+- [The Veryl Hardware Description Language](https://doc.veryl-lang.org/book/)
 
 ## Installation
 
