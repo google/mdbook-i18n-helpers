@@ -17,30 +17,30 @@
 //! This program works like `xgettext`, meaning it will extract
 //! translatable strings from your book. The strings are saved in a
 //! GNU Gettext `messages.pot` file in your build directory (typically
-//! `po/messages.pot`).
+//! `po/messages.pot`). When the `depth` parameter is included, a new
+//! directory will contain the template files split based on the tiers
+//! of Chapter nesting.
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use mdbook::renderer::RenderContext;
-use mdbook_i18n_helpers::xgettext::create_catalog;
+use mdbook_i18n_helpers::xgettext::create_catalogs;
 use std::{fs, io};
 
 fn main() -> anyhow::Result<()> {
     let ctx = RenderContext::from_json(&mut io::stdin()).context("Parsing stdin")?;
-    let cfg = ctx
-        .config
-        .get_renderer("xgettext")
-        .ok_or_else(|| anyhow!("Could not read output.xgettext configuration"))?;
-    let path = cfg
-        .get("pot-file")
-        .ok_or_else(|| anyhow!("Missing output.xgettext.pot-file config value"))?
-        .as_str()
-        .ok_or_else(|| anyhow!("Expected a string for output.xgettext.pot-file"))?;
     fs::create_dir_all(&ctx.destination)
         .with_context(|| format!("Could not create {}", ctx.destination.display()))?;
-    let output_path = ctx.destination.join(path);
-    let catalog = create_catalog(&ctx, std::fs::read_to_string).context("Extracting messages")?;
-    polib::po_file::write(&catalog, &output_path)
-        .with_context(|| format!("Writing messages to {}", output_path.display()))?;
+    let catalogs = create_catalogs(&ctx, std::fs::read_to_string).context("Extracting messages")?;
+
+    // Create a template file for each entry with the content from the respective catalog.
+    for (file_path, catalog) in catalogs {
+        let directory_path = file_path.parent().unwrap();
+        fs::create_dir_all(directory_path)
+            .with_context(|| format!("Could not create {}", directory_path.display()))?;
+
+        polib::po_file::write(&catalog, &file_path)
+            .with_context(|| format!("Writing messages to {}", file_path.display()))?;
+    }
 
     Ok(())
 }

@@ -77,11 +77,21 @@ To extract the original text and generate a `messages.pot` file, you run
 `mdbook` with the `mdbook-xgettext` renderer:
 
 ```shell
-MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' \
+MDBOOK_OUTPUT='{"xgettext": {}}' \
   mdbook build -d po
 ```
 
 You will find the generated POT file as `po/messages.pot`.
+
+To extract the text into smaller `.pot` files based on the text's Markdown
+outline, use the `depth` parameter. For a `depth` of `1`, the `.pot` lines will
+be separated into a file for each section or chapter title. Use greater values
+to split the `.pot` file further.
+
+```shell
+MDBOOK_OUTPUT='{"xgettext": {"depth": "1"}}' \
+  mdbook build -d po/messages
+```
 
 ### Initialize a New Translation
 
