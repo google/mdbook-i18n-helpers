@@ -95,7 +95,7 @@ jobs:
           path: repo_root
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ github.workspace }}/codecov_report.json
@@ -106,4 +106,6 @@ jobs:
           # the analysis on HEAD.
           override_commit: ${{ steps.parse_previous_artifacts.outputs.override_commit || '' }}
           override_pr: ${{ steps.parse_previous_artifacts.outputs.override_pr || '' }}
-          root_dir: ${{ github.workspace }}/repo_root
+          working-directory: ${{ github.workspace }}/repo_root
+          # Location where coverage report files are searched for
+          directory: ${{ github.workspace }}
