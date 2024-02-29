@@ -6,7 +6,7 @@ use std::str::FromStr;
 use libfuzzer_sys::fuzz_target;
 use mdbook::renderer::RenderContext;
 use mdbook::Config;
-use mdbook_i18n_helpers::xgettext::create_catalog;
+use mdbook_i18n_helpers::xgettext::create_catalogs;
 use mdbook_i18n_helpers_fuzz::{create_book, BookItem};
 
 fuzz_target!(|inputs: (&str, Vec<BookItem>)| {
@@ -16,5 +16,5 @@ fuzz_target!(|inputs: (&str, Vec<BookItem>)| {
 
     let ctx = RenderContext::new(PathBuf::new(), book, Config::from_str("").unwrap(), "");
 
-    let _ = create_catalog(&ctx, |_| Ok(summary.to_string()));
+    let _ = create_catalogs(&ctx, |_| Ok(summary.to_string()));
 });
