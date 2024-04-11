@@ -310,7 +310,7 @@ mod tests {
         let catalog = create_catalog(&[("Foo", "FOO"), ("Bar", "BAR")]);
         assert_eq!(
             translate("# Foo { #id .foo }", &catalog),
-            "# FOO {#id .foo}"
+            "# FOO { #id .foo }"
         );
     }
 

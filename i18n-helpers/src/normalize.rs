@@ -49,11 +49,12 @@ fn has_broken_link(text: &str) -> bool {
     new_cmark_parser(text, Some(&mut callback)).any(|event| {
         matches!(
             event,
-            Event::Start(Tag::Link(
-                LinkType::ReferenceUnknown | LinkType::CollapsedUnknown | LinkType::ShortcutUnknown,
-                _,
-                _
-            ))
+            Event::Start(Tag::Link {
+                link_type: LinkType::ReferenceUnknown
+                    | LinkType::CollapsedUnknown
+                    | LinkType::ShortcutUnknown,
+                ..
+            })
         )
     })
 }

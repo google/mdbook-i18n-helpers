@@ -24,7 +24,9 @@
 //! how to use the supplied `mdbook` plugins.
 
 use polib::catalog::Catalog;
-use pulldown_cmark::{CodeBlockKind, Event, LinkType, Tag};
+use pulldown_cmark::{
+    BrokenLinkCallback, CodeBlockKind, DefaultBrokenLinkCallback, Event, LinkType, Tag, TagEnd,
+};
 use pulldown_cmark_to_cmark::{
     calculate_code_block_token_count, cmark_resume_with_options, Options, State,
 };
@@ -50,13 +52,13 @@ pub fn wrap_sources(sources: &str) -> String {
 
 /// Like `mdbook::utils::new_cmark_parser`, but also passes a
 /// `BrokenLinkCallback`.
-pub fn new_cmark_parser<'input, 'callback>(
+pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
     text: &'input str,
-    broken_link_callback: pulldown_cmark::BrokenLinkCallback<'input, 'callback>,
-) -> pulldown_cmark::Parser<'input, 'callback> {
+    broken_link_callback: Option<F>,
+) -> pulldown_cmark::Parser<'input, F> {
     let mut options = pulldown_cmark::Options::empty();
     options.insert(pulldown_cmark::Options::ENABLE_TABLES);
-    options.insert(pulldown_cmark::Options::ENABLE_FOOTNOTES);
+    options.insert(pulldown_cmark::Options::ENABLE_OLD_FOOTNOTES);
     options.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
     options.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
     options.insert(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
@@ -76,7 +78,7 @@ pub fn new_cmark_parser<'input, 'callback>(
 ///
 /// ```
 /// use mdbook_i18n_helpers::extract_events;
-/// use pulldown_cmark::{Event, Tag};
+/// use pulldown_cmark::{Event, Tag, TagEnd};
 ///
 /// assert_eq!(
 ///     extract_events("Hello,\nworld!", None),
@@ -85,20 +87,36 @@ pub fn new_cmark_parser<'input, 'callback>(
 ///         (1, Event::Text("Hello,".into())),
 ///         (1, Event::Text(" ".into())),
 ///         (2, Event::Text("world!".into())),
-///         (1, Event::End(Tag::Paragraph)),
+///         (1, Event::End(TagEnd::Paragraph)),
 ///     ]
 /// );
 /// ```
-pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(usize, Event<'a>)> {
+pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize, Event<'a>)> {
     // Expand a `[foo]` style link into `[foo][foo]`.
     fn expand_shortcut_link(tag: Tag) -> Tag {
         match tag {
-            Tag::Link(LinkType::Shortcut, reference, title) => {
-                Tag::Link(LinkType::Reference, reference, title)
-            }
-            Tag::Image(LinkType::Shortcut, reference, title) => {
-                Tag::Image(LinkType::Reference, reference, title)
-            }
+            Tag::Link {
+                link_type: LinkType::Shortcut,
+                dest_url,
+                title,
+                id,
+            } => Tag::Link {
+                link_type: LinkType::Reference,
+                dest_url,
+                title,
+                id,
+            },
+            Tag::Image {
+                link_type: LinkType::Shortcut,
+                dest_url,
+                title,
+                id,
+            } => Tag::Image {
+                link_type: LinkType::Reference,
+                dest_url,
+                title,
+                id,
+            },
             _ => tag,
         }
     }
@@ -120,7 +138,7 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
             .map(|(idx, line)| (idx + 1, Event::Text(line.into())))
             .collect(),
         // Otherwise, we parse the text line normally.
-        _ => new_cmark_parser(text, None)
+        _ => new_cmark_parser::<'a, DefaultBrokenLinkCallback>(text, None)
             .into_offset_iter()
             .map(|(event, range)| {
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
@@ -130,11 +148,8 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'static>>) -> Vec<(
                     // in output. By changing them to a reference
                     // link, the link is expanded on the fly and the
                     // output becomes self-contained.
-                    Event::Start(tag @ (Tag::Link(..) | Tag::Image(..))) => {
+                    Event::Start(tag @ (Tag::Link { .. } | Tag::Image { .. })) => {
                         Event::Start(expand_shortcut_link(tag))
-                    }
-                    Event::End(tag @ (Tag::Link(..) | Tag::Image(..))) => {
-                        Event::End(expand_shortcut_link(tag))
                     }
                     _ => event,
                 };
@@ -189,7 +204,7 @@ impl GroupingContext {
 ///
 /// ```
 /// use mdbook_i18n_helpers::{extract_events, group_events, Group};
-/// use pulldown_cmark::{Event, Tag};
+/// use pulldown_cmark::{Event, Tag, TagEnd};
 ///
 /// let events = extract_events("- A list item.", None);
 /// assert_eq!(
@@ -198,8 +213,8 @@ impl GroupingContext {
 ///         (1, Event::Start(Tag::List(None))),
 ///         (1, Event::Start(Tag::Item)),
 ///         (1, Event::Text("A list item.".into())),
-///         (1, Event::End(Tag::Item)),
-///         (1, Event::End(Tag::List(None))),
+///         (1, Event::End(TagEnd::Item)),
+///         (1, Event::End(TagEnd::List(false))),
 ///     ],
 /// );
 ///
@@ -216,8 +231,8 @@ impl GroupingContext {
 ///                 (1, Event::Text("A list item.".into())),
 ///             ], comment: "".into()},
 ///         Group::Skip(vec![
-///             (1, Event::End(Tag::Item)),
-///             (1, Event::End(Tag::List(None))),
+///             (1, Event::End(TagEnd::Item)),
+///             (1, Event::End(TagEnd::List(false))),
 ///         ]),
 ///     ]
 /// );
@@ -278,7 +293,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
 
                 state = State::Translate(idx);
             }
-            Event::End(Tag::Paragraph | Tag::CodeBlock(..)) => {
+            Event::End(TagEnd::Paragraph | TagEnd::CodeBlock) => {
                 // A translatable group ends after `idx`.
                 let idx = idx + 1;
                 let mut next_groups;
@@ -290,10 +305,18 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
 
             // Inline events start or continue a translating group.
             Event::Start(
-                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
+                Tag::Emphasis
+                | Tag::Strong
+                | Tag::Strikethrough
+                | Tag::Link { .. }
+                | Tag::Image { .. },
             )
             | Event::End(
-                Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link(..) | Tag::Image(..),
+                TagEnd::Emphasis
+                | TagEnd::Strong
+                | TagEnd::Strikethrough
+                | TagEnd::Link
+                | TagEnd::Image,
             )
             | Event::Text(_)
             | Event::Code(_)
@@ -311,7 +334,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                 }
             }
 
-            Event::Html(s) => {
+            Event::Html(s) | Event::InlineHtml(s) => {
                 match directives::find(s) {
                     Some(directives::Directive::Skip) => {
                         // If in the middle of translation, finish it.
@@ -389,7 +412,7 @@ fn is_codeblock_group(events: &[(usize, Event)]) -> bool {
         [
             (_, Event::Start(Tag::CodeBlock(_))),
             ..,
-            (_, Event::End(Tag::CodeBlock(_)))
+            (_, Event::End(TagEnd::CodeBlock))
         ]
     )
 }
@@ -410,7 +433,7 @@ fn heuristic_codeblock<'a>(
     mut ctx: GroupingContext,
 ) -> (Vec<Group<'a>>, GroupingContext) {
     let is_translate = match events {
-        [(_, Event::Start(Tag::CodeBlock(_))), .., (_, Event::End(Tag::CodeBlock(_)))] => {
+        [(_, Event::Start(Tag::CodeBlock(_))), .., (_, Event::End(TagEnd::CodeBlock))] => {
             let (codeblock_text, _) = reconstruct_markdown(events, None);
             // Heuristic to check whether the codeblock nether has a
             // literal string nor a line comment.  We may actually
@@ -581,10 +604,10 @@ fn extract_trailing_whitespaces<'a>(buf: &mut Vec<(usize, Event<'a>)>) -> Vec<(u
 /// emphasis and `**` for strong emphasis. The style is chosen to
 /// match the [Google developer documentation style
 /// guide](https://developers.google.com/style/text-formatting).
-pub fn reconstruct_markdown(
-    group: &[(usize, Event)],
-    state: Option<State<'static>>,
-) -> (String, State<'static>) {
+pub fn reconstruct_markdown<'a>(
+    group: &[(usize, Event<'a>)],
+    state: Option<State<'a>>,
+) -> (String, State<'a>) {
     let events = group.iter().map(|(_, event)| event);
     let code_block_token_count = calculate_code_block_token_count(events.clone()).unwrap_or(3);
     let mut markdown = String::new();
@@ -725,7 +748,7 @@ pub fn extract_messages(document: &str) -> Vec<(usize, ExtractedMessage)> {
 /// has been wrapped in a paragraph:
 ///
 /// ```
-/// use pulldown_cmark::{Event, Tag};
+/// use pulldown_cmark::{Event, Tag, TagEnd};
 /// use mdbook_i18n_helpers::{extract_events, reconstruct_markdown, trim_paragraph};
 ///
 /// let old_events = vec![(1, Event::Text("A line of text".into()))];
@@ -737,7 +760,7 @@ pub fn extract_messages(document: &str) -> Vec<(usize, ExtractedMessage)> {
 ///     &[
 ///         (1, Event::Start(Tag::Paragraph)),
 ///         (1, Event::Text("A line of text".into())),
-///         (1, Event::End(Tag::Paragraph)),
+///         (1, Event::End(TagEnd::Paragraph)),
 ///     ],
 /// );
 ///
@@ -753,8 +776,8 @@ pub fn trim_paragraph<'a, 'event>(
     use pulldown_cmark::Event::{End, Start};
     use pulldown_cmark::Tag::Paragraph;
     match new_events {
-        [(_, Start(Paragraph)), inner @ .., (_, End(Paragraph))] => match old_events {
-            [(_, Start(Paragraph)), .., (_, End(Paragraph))] => new_events,
+        [(_, Start(Paragraph)), inner @ .., (_, End(TagEnd::Paragraph))] => match old_events {
+            [(_, Start(Paragraph)), .., (_, End(TagEnd::Paragraph))] => new_events,
             [..] => inner,
         },
         [..] => new_events,
@@ -838,7 +861,7 @@ mod tests {
             vec![
                 (1, Start(Paragraph)),
                 (1, Text("foo bar".into())),
-                (1, End(Paragraph)),
+                (1, End(TagEnd::Paragraph)),
             ]
         );
     }
@@ -852,7 +875,7 @@ mod tests {
                 (1, Text("foo".into())),
                 (1, Text(" ".into())),
                 (2, Text("bar".into())),
-                (1, End(Paragraph)),
+                (1, End(TagEnd::Paragraph)),
             ]
         );
     }
@@ -862,9 +885,17 @@ mod tests {
         assert_eq!(
             extract_events("# Foo Bar", None),
             vec![
-                (1, Start(Heading(H1, None, vec![]))),
+                (
+                    1,
+                    Start(Tag::Heading {
+                        level: H1,
+                        id: None,
+                        classes: vec![],
+                        attrs: vec![]
+                    })
+                ),
                 (1, Text("Foo Bar".into())),
-                (1, End(Heading(H1, None, vec![]))),
+                (1, End(TagEnd::Heading(H1))),
             ]
         );
     }
@@ -877,8 +908,8 @@ mod tests {
                 (1, Start(List(None))),
                 (1, Start(Item)),
                 (1, Text("foo bar".into())),
-                (1, End(Item)),
-                (1, End(List(None))),
+                (1, End(TagEnd::Item)),
+                (1, End(TagEnd::List(false))),
             ]
         );
     }
@@ -906,7 +937,7 @@ mod tests {
                 (2, Text("bar".into())),
                 (2, Text(" ".into())),
                 (3, Text("baz".into())),
-                (1, End(Paragraph)),
+                (1, End(TagEnd::Paragraph)),
             ]
         );
     }
@@ -916,10 +947,12 @@ mod tests {
         assert_eq!(
             extract_events("<!-- mdbook-xgettext:skip -->\nHello", None),
             vec![
+                (1, Start(HtmlBlock)),
                 (1, Html("<!-- mdbook-xgettext:skip -->\n".into())),
+                (1, End(TagEnd::HtmlBlock)),
                 (2, Start(Paragraph)),
                 (2, Text("Hello".into())),
-                (2, End(Paragraph)),
+                (2, End(TagEnd::Paragraph)),
             ]
         );
     }
