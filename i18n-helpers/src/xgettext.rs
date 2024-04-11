@@ -24,15 +24,15 @@ use mdbook::{book, BookItem};
 use polib::catalog::Catalog;
 use polib::message::{Message, MessageMutView, MessageView};
 use polib::metadata::CatalogMetadata;
-use pulldown_cmark::{Event, Tag};
+use pulldown_cmark::{Event, Tag, TagEnd};
 
 /// Strip an optional link from a Markdown string.
 fn strip_link(text: &str) -> String {
     let events = extract_events(text, None)
         .into_iter()
         .filter_map(|(_, event)| match event {
-            Event::Start(Tag::Link(..)) => None,
-            Event::End(Tag::Link(..)) => None,
+            Event::Start(Tag::Link { .. }) => None,
+            Event::End(TagEnd::Link) => None,
             _ => Some((0, event)),
         })
         .collect::<Vec<_>>();

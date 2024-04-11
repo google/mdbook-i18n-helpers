@@ -17,8 +17,8 @@ anyhow.workspace = true
 chrono = { version = "0.4.38", default-features = false, features = ["alloc"] }
 mdbook.workspace = true
 polib.workspace = true
-pulldown-cmark = { version = "0.9.2", default-features = false }
-pulldown-cmark-to-cmark = "11.2.0"
+pulldown-cmark = { version = "0.10.3", default-features = false, features = ["html"] }
+pulldown-cmark-to-cmark = "13.0.0"
 regex = "1.10.4"
 semver = "1.0.22"
 serde_json.workspace = true
