@@ -20,7 +20,7 @@ polib.workspace = true
 pulldown-cmark = { version = "0.9.2", default-features = false }
 pulldown-cmark-to-cmark = "11.2.0"
 regex = "1.10.4"
-semver = "1.0.22"
+semver = "1.0.23"
 serde_json.workspace = true
 syntect = "5.2.0"
 textwrap = { version = "0.16.1", default-features = false }
