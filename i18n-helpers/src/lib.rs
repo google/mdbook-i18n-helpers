@@ -367,14 +367,26 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
 
                         ctx.comments.push(comment);
                     }
-                    // Otherwise, treat as a skipping group.
                     _ => {
-                        if let State::Translate(_) = state {
-                            let mut next_groups;
-                            (next_groups, ctx) = state.into_groups(idx, events, ctx);
-                            groups.append(&mut next_groups);
+                        // Otherwise, treat as a skipping group if this is a block level Html tag
+                        if matches!(event, Event::Html(_)) {
+                            if let State::Translate(_) = state {
+                                let mut next_groups;
+                                (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                                groups.append(&mut next_groups);
 
-                            state = State::Skip(idx);
+                                state = State::Skip(idx);
+                            }
+                        } else if matches!(event, Event::InlineHtml(_)) {
+                            // If we're currently skipping, then a new
+                            // translatable group starts here.
+                            if let State::Skip(_) = state {
+                                let mut next_groups;
+                                (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                                groups.append(&mut next_groups);
+
+                                state = State::Translate(idx);
+                            }
                         }
                     }
                 }
@@ -963,13 +975,21 @@ mod tests {
     }
 
     #[test]
-    fn extract_messages_empty_html() {
-        assert_extract_messages("<span></span>", &[]);
+    fn extract_messages_keep_empty_inline_html() {
+        // Keep inline html tags
+        assert_extract_messages("<span></span>", &[(1, "<span></span>")]);
     }
 
     #[test]
-    fn extract_messages_whitespace_only() {
-        assert_extract_messages("<span>  </span>", &[]);
+    fn extract_messages_keep_whitespace_inline_html() {
+        // span is an inline html tag so even whitespace is kept as is
+        assert_extract_messages("<span>  </span>", &[(1, "<span>  </span>")]);
+    }
+
+    #[test]
+    fn extract_messages_ignore_whitespace_only_block_html() {
+        // Whitespace in block level html tags is ignored
+        assert_extract_messages("<p>  </p>", &[]);
     }
 
     #[test]
@@ -1027,13 +1047,36 @@ mod tests {
 
     #[test]
     fn extract_messages_inline_html() {
-        // HTML tags are skipped, but text inside is extracted:
+        // Inline HTML tag is kept as is in the translation.
         assert_extract_messages(
-            "Hi <script>alert('there');</script>",
-            &[
-                (1, "Hi "), //
-                (1, "alert('there');"),
-            ],
+            "Hi from <span dir=\"ltr\">Rust</div>",
+            &[(1, "Hi from <span dir=\"ltr\">Rust</div>")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_block_html() {
+        // block level HTML tag is skipped, but text inside is extracted.
+        assert_extract_messages(
+            "<div class=\"warning\">\n\
+            \n\
+            Beware of the dog!\n\
+            \n\
+            </div>",
+            &[(3, "Beware of the dog!")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_mixed_html() {
+        // block level HTML tag is skipped, but text inside is extracted with inline html as is.
+        assert_extract_messages(
+            "<div>\n\
+            \n\
+            Hi from <span dir=\"ltr\">Rust</span>\n\
+            \n\
+            </div>",
+            &[(3, "Hi from <span dir=\"ltr\">Rust</span>")],
         );
     }
 
@@ -1480,7 +1523,20 @@ But *this* should!
     }
 
     #[test]
-    fn extract_messages_inline_skips() {
+    fn extract_messages_block_html_skip() {
+        // The comment is a block level html tag.
+        assert_extract_messages(
+            "<!-- mdbook-xgettext:skip -->\n\
+            This is ignored\n\
+            \n\
+            but this is not",
+            &[(4, "but this is not")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_inline_html_skips() {
+        // The comment is an inline html tag.
         assert_extract_messages(
             "
 this should be translated <!-- mdbook-xgettext:skip --> but not this.

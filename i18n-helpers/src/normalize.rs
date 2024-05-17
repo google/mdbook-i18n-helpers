@@ -461,6 +461,34 @@ mod tests {
     }
 
     #[test]
+    fn test_normalize_inline_html() {
+        // Inline tags are kept as is.
+        let catalog = create_catalog(&[("foo <span>bar</span>", "FOO <span>BAR</span>")]);
+        assert_normalized_messages_eq(
+            catalog,
+            &[exact("foo <span>bar</span>", "FOO <span>BAR</span>")],
+        );
+    }
+
+    #[test]
+    fn test_normalize_block_html() {
+        // Block level tags are not translated.
+        let catalog = create_catalog(&[(
+            "<div class=\"warning\">\n\
+            \n\
+            foo\n\
+            \n\
+            </div>",
+            "<div class=\"warning\">\n\
+            \n\
+            FOO\n\
+            \n\
+            </div>",
+        )]);
+        assert_normalized_messages_eq(catalog, &[exact("foo", "FOO")]);
+    }
+
+    #[test]
     fn test_normalize_disappearing_html() {
         // Normalizing "<b>" results in no messages.
         let catalog = create_catalog(&[("<b>", "FOO")]);
