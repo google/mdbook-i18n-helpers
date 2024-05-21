@@ -368,25 +368,31 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
                         ctx.comments.push(comment);
                     }
                     _ => {
-                        // Otherwise, treat as a skipping group if this is a block level Html tag
-                        if matches!(event, Event::Html(_)) {
-                            if let State::Translate(_) = state {
-                                let mut next_groups;
-                                (next_groups, ctx) = state.into_groups(idx, events, ctx);
-                                groups.append(&mut next_groups);
+                        match event {
+                            Event::Html(_) => {
+                                // Otherwise, treat as a skipping group if this is a block level Html tag
+                                if let State::Translate(_) = state {
+                                    let mut next_groups;
+                                    (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                                    groups.append(&mut next_groups);
 
-                                state = State::Skip(idx);
+                                    state = State::Skip(idx);
+                                }
                             }
-                        } else if matches!(event, Event::InlineHtml(_)) {
+                            Event::InlineHtml(_) =>
                             // If we're currently skipping, then a new
                             // translatable group starts here.
-                            if let State::Skip(_) = state {
-                                let mut next_groups;
-                                (next_groups, ctx) = state.into_groups(idx, events, ctx);
-                                groups.append(&mut next_groups);
+                            {
+                                if let State::Skip(_) = state {
+                                    let mut next_groups;
+                                    (next_groups, ctx) = state.into_groups(idx, events, ctx);
+                                    groups.append(&mut next_groups);
 
-                                state = State::Translate(idx);
+                                    state = State::Translate(idx);
+                                }
                             }
+                            // this code is inside a match of Event::{Html|InlineHtml}, other types are not possible
+                            _ => unreachable!(),
                         }
                     }
                 }
