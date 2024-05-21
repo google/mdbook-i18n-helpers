@@ -37,6 +37,7 @@ use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxSet};
 pub mod directives;
 pub mod gettext;
 pub mod normalize;
+pub mod preprocessors;
 pub mod xgettext;
 
 /// Re-wrap the sources field of a message.
@@ -93,7 +94,7 @@ pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
 /// ```
 pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize, Event<'a>)> {
     // Expand a `[foo]` style link into `[foo][foo]`.
-    fn expand_shortcut_link(tag: Tag) -> Tag {
+    fn expand_shortcut_link(tag: Tag<'_>) -> Tag<'_> {
         match tag {
             Tag::Link {
                 link_type: LinkType::Shortcut,
@@ -406,7 +407,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Vec<Group<'a>> {
 }
 
 /// Returns true if the events appear to be a codeblock.
-fn is_codeblock_group(events: &[(usize, Event)]) -> bool {
+fn is_codeblock_group(events: &[(usize, Event<'_>)]) -> bool {
     matches!(
         events,
         [
@@ -429,7 +430,7 @@ fn is_translate_scope(x: Scope) -> bool {
 
 /// Creates groups by checking codeblock with heuristic way.
 fn heuristic_codeblock<'a>(
-    events: &'a [(usize, Event)],
+    events: &'a [(usize, Event<'_>)],
     mut ctx: GroupingContext,
 ) -> (Vec<Group<'a>>, GroupingContext) {
     let is_translate = match events {
@@ -458,7 +459,7 @@ fn heuristic_codeblock<'a>(
 
 /// Creates groups by parsing codeblock.
 fn parse_codeblock<'a>(
-    events: &'a [(usize, Event)],
+    events: &'a [(usize, Event<'_>)],
     mut ctx: GroupingContext,
 ) -> (Vec<Group<'a>>, GroupingContext) {
     // Language detection from language identifier of codeblock.
