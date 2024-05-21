@@ -113,7 +113,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install nightly Rust
-        run: rustup default nightly
+        run: rustup default nightly-2024-05-10
 
       - uses: Swatinem/rust-cache@v2
         with:
