@@ -245,6 +245,24 @@ mod tests {
     }
 
     #[test]
+    fn test_translate_inline_html() {
+        let catalog = create_catalog(&[("foo <b>bar</b> baz", "FOO <b>BAR</b> BAZ")]);
+        assert_eq!(
+            translate("foo <b>bar</b> baz", &catalog),
+            "FOO <b>BAR</b> BAZ"
+        );
+    }
+
+    #[test]
+    fn test_translate_block_html() {
+        let catalog = create_catalog(&[("foo", "FOO"), ("bar", "BAR")]);
+        assert_eq!(
+            translate("<div>\n\nfoo\n\n</div><div>\n\nbar\n\n</div>", &catalog),
+            "<div>\n\nFOO\n\n</div><div>\n\nBAR\n\n</div>"
+        );
+    }
+
+    #[test]
     fn test_translate_table() {
         let catalog = create_catalog(&[
             ("Types", "TYPES"),
