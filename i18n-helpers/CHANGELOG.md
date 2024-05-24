@@ -2,6 +2,19 @@
 
 This lists the most important changes between releases of mdbook-i18n-helpers.
 
+## Version 0.3.3 (2024-05-25)
+
+- [#107], [#177]: Support for translator comments by @dyoo
+- [#147]: Performance optimization with caching `SyntaxSet` by @mgeisler
+- [#143], [#149], [#162], [#168], [#179]: Stability improvements to coverage
+  reports by @kdarkhan
+- [#153], [#157]: Fix wrong codeblock indent count by @dalance
+- [#155]: `fuzz` directory was made a part of the workspace by @kdarkhan
+- [#156]: Fix for duplicate sources in PO files by @zachcmadsen
+- [#193]: Export `Gettext` preprocessor to enable the lib to be used in Rust
+  compiler docs by @dalance
+- [#195]: Improve grouping behavior of inline HTML by @michael-kerscher
+
 ## Version 0.3.2 (2024-01-15)
 
 - [#145]: Add support for rounding line numbers by @mgeisler.
@@ -60,12 +73,26 @@ add [more controls][#76] for this in the future.
 
 First release as a stand-alone crate.
 
+[#195]: https://github.com/google/mdbook-i18n-helpers/pull/195
+[#193]: https://github.com/google/mdbook-i18n-helpers/pull/193
+[#179]: https://github.com/google/mdbook-i18n-helpers/pull/179
+[#177]: https://github.com/google/mdbook-i18n-helpers/pull/177
+[#168]: https://github.com/google/mdbook-i18n-helpers/pull/168
+[#162]: https://github.com/google/mdbook-i18n-helpers/pull/162
+[#157]: https://github.com/google/mdbook-i18n-helpers/pull/157
+[#156]: https://github.com/google/mdbook-i18n-helpers/pull/156
+[#155]: https://github.com/google/mdbook-i18n-helpers/pull/155
+[#153]: https://github.com/google/mdbook-i18n-helpers/pull/153
+[#149]: https://github.com/google/mdbook-i18n-helpers/pull/149
+[#147]: https://github.com/google/mdbook-i18n-helpers/pull/147
 [#145]: https://github.com/google/mdbook-i18n-helpers/pull/145
+[#143]: https://github.com/google/mdbook-i18n-helpers/pull/143
 [#129]: https://github.com/google/mdbook-i18n-helpers/pull/129
 [#128]: https://github.com/google/mdbook-i18n-helpers/pull/128
 [#121]: https://github.com/google/mdbook-i18n-helpers/pull/121
 [#111]: https://github.com/google/mdbook-i18n-helpers/pull/111
 [#109]: https://github.com/google/mdbook-i18n-helpers/pull/109
+[#107]: https://github.com/google/mdbook-i18n-helpers/pull/107
 [#100]: https://github.com/google/mdbook-i18n-helpers/pull/100
 [#93]: https://github.com/google/mdbook-i18n-helpers/pull/93
 [#87]: https://github.com/google/mdbook-i18n-helpers/pull/87
