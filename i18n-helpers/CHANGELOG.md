@@ -2,6 +2,10 @@
 
 This lists the most important changes between releases of mdbook-i18n-helpers.
 
+## Version 0.3.4 (2024-05-26)
+
+- [#203] : Fix removal of links by @dalance
+
 ## Version 0.3.3 (2024-05-25)
 
 - [#107], [#177]: Support for translator comments by @dyoo
@@ -73,6 +77,7 @@ add [more controls][#76] for this in the future.
 
 First release as a stand-alone crate.
 
+[#203]: https://github.com/google/mdbook-i18n-helpers/pull/203
 [#195]: https://github.com/google/mdbook-i18n-helpers/pull/195
 [#193]: https://github.com/google/mdbook-i18n-helpers/pull/193
 [#179]: https://github.com/google/mdbook-i18n-helpers/pull/179
