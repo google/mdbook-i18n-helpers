@@ -219,7 +219,7 @@ where
             for (lineno, extracted) in extract_messages(&chapter.content) {
                 let msgid = extracted.message;
                 let source = build_source(&path, lineno, granularity);
-                add_message(catalog, &strip_link(&msgid), &source, &extracted.comment);
+                add_message(catalog, &msgid, &source, &extracted.comment);
             }
 
             // Add the contents for all of the sub-chapters within the
@@ -239,7 +239,7 @@ where
                 for (lineno, extracted) in extract_messages(&content) {
                     let msgid = extracted.message;
                     let source = format!("{}:{}", source.display(), lineno);
-                    add_message(catalog, &strip_link(&msgid), &source, &extracted.comment);
+                    add_message(catalog, &msgid, &source, &extracted.comment);
                 }
             }
         }
@@ -513,7 +513,9 @@ mod tests {
                 "# How to Foo\n\
                  \n\
                  First paragraph.\n\
-                 Same paragraph.\n",
+                 Same paragraph.\n\
+                 \n\
+                 [Link](https://example.com)\n",
             ),
         ])?;
 
@@ -533,6 +535,7 @@ mod tests {
                 ("src/SUMMARY.md:1", "The _Foo_ Chapter"),
                 ("src/foo.md:1", "How to Foo"),
                 ("src/foo.md:3", "First paragraph. Same paragraph."),
+                ("src/foo.md:6", "[Link](https://example.com)"),
             ]
         );
 
