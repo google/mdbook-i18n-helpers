@@ -23,7 +23,6 @@ regex = "1.10"
 semver = "1.0.23"
 serde_json.workspace = true
 syntect = { version = "5.2.0", default-features = false, features = ["parsing", "default-syntaxes", "regex-onig"] }
-tera = { version = "1.20.0", default-features = false }
 textwrap = { version = "0.16.1", default-features = false }
 
 [dev-dependencies]
