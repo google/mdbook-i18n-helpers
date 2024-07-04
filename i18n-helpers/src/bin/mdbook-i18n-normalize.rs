@@ -1,4 +1,4 @@
-//! Normalize the Markdown in a  a PO or POT file.
+//! Normalize the Markdown in a PO or POT file.
 //!
 //! This program will process all entries in a PO or POT file and
 //! normalize the Markdown found there. Both the `msgid` (the source
