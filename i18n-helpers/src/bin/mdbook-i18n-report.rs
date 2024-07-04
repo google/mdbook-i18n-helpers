@@ -27,11 +27,10 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut languages = translations
-        .into_iter()
+        .iter()
         .map(|translation| {
             let catalog = po_file::parse(Path::new(translation))
                 .with_context(|| format!("Could not parse {:?}", &translation))?;
-            println!("Read {} messages from {}", catalog.count(), translation);
             let stats = counts(&catalog);
             Ok::<_, anyhow::Error>((catalog.metadata.language, stats))
         })
@@ -117,12 +116,10 @@ fn counts(catalog: &Catalog) -> MessageStats {
             } else {
                 stats.translated_count += 1;
             }
+        } else if message.is_fuzzy() {
+            stats.fuzzy_non_translated_count += 1;
         } else {
-            if message.is_fuzzy() {
-                stats.fuzzy_non_translated_count += 1;
-            } else {
-                stats.non_translated_count += 1;
-            }
+            stats.non_translated_count += 1;
         }
     }
     stats
