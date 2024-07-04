@@ -17,24 +17,50 @@
 
 mod stats;
 
-use anyhow::{bail, Context as _};
+use anyhow::Context as _;
+use clap::Parser;
 use polib::po_file;
 use stats::MessageStats;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use tera::{Context, Tera};
 
 const REPORT_TEMPLATE: &str = include_str!("../templates/report.html");
 
 fn main() -> anyhow::Result<()> {
-    let args = std::env::args().collect::<Vec<_>>();
-    let [_, report_file, translations @ ..] = args.as_slice() else {
-        bail!("Usage: {} <report.html> <language.po>...", args[0]);
-    };
+    let args = Args::parse();
+    match args {
+        Args::Report {
+            report_file,
+            translation_files,
+        } => {
+            report(&report_file, &translation_files)?;
+        }
+    }
 
-    let mut languages = translations
+    Ok(())
+}
+
+#[derive(Clone, Debug, Parser)]
+enum Args {
+    /// Generate an HTML report about the status of translations in each of the given language files.
+    Report {
+        /// The filename to which to write the report.
+        #[arg(id = "report.html")]
+        report_file: PathBuf,
+        #[arg(id = "language.po")]
+        translation_files: Vec<PathBuf>,
+    },
+}
+
+/// Generates an HTML report about the status of translations in each of the given language files.
+fn report(report_file: &Path, translation_files: &[PathBuf]) -> anyhow::Result<()> {
+    let mut languages = translation_files
         .iter()
         .map(|translation| {
-            let catalog = po_file::parse(Path::new(translation))
+            let catalog = po_file::parse(translation)
                 .with_context(|| format!("Could not parse {:?}", &translation))?;
             let stats = MessageStats::for_catalog(&catalog);
             Ok::<_, anyhow::Error>(stats)
