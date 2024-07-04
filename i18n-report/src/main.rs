@@ -20,6 +20,8 @@ use polib::{catalog::Catalog, po_file};
 use std::{collections::BTreeMap, fs, path::Path};
 use tera::{Context, Tera, Value};
 
+const REPORT_TEMPLATE: &str = include_str!("../templates/report.html");
+
 fn main() -> anyhow::Result<()> {
     let args = std::env::args().collect::<Vec<_>>();
     let [_, report_file, translations @ ..] = args.as_slice() else {
@@ -42,10 +44,9 @@ fn main() -> anyhow::Result<()> {
         .map(MessageStats::to_context)
         .collect::<Vec<_>>();
 
-    let tera = Tera::new("templates/*.html")?;
     let mut context = Context::new();
     context.insert("languages", &languages);
-    let report = tera.render("report.html", &context)?;
+    let report = Tera::one_off(REPORT_TEMPLATE, &context, true)?;
     fs::write(report_file, report)?;
 
     Ok(())
