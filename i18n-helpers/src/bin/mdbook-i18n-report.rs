@@ -55,6 +55,7 @@ fn main() -> anyhow::Result<()> {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct MessageStats {
     pub language: String,
+    pub pot_creation_date: String,
     pub non_translated_count: u32,
     pub translated_count: u32,
     pub fuzzy_non_translated_count: u32,
@@ -74,6 +75,10 @@ impl MessageStats {
     fn to_context(&self) -> BTreeMap<String, Value> {
         let mut context: BTreeMap<String, Value> = BTreeMap::new();
         context.insert("language".to_string(), self.language.as_str().into());
+        context.insert(
+            "pot_creation_date".to_string(),
+            self.pot_creation_date.as_str().into(),
+        );
         context.insert(
             "non_translated_count".to_string(),
             self.non_translated_count.into(),
@@ -112,6 +117,7 @@ impl MessageStats {
 fn counts(catalog: &Catalog) -> MessageStats {
     let mut stats = MessageStats {
         language: catalog.metadata.language.clone(),
+        pot_creation_date: catalog.metadata.pot_creation_date.clone(),
         ..MessageStats::default()
     };
     for message in catalog.messages() {

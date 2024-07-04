@@ -19,6 +19,7 @@
     <table>
       <tr>
         <th>Language</th>
+        <th>Last synced</th>
         <th>Total</th>
         <th>Translated</th>
         <th>Fuzzy translated</th>
@@ -27,20 +28,21 @@
       </tr>
       {% for language in languages %}
       <tr>
-        <td>{{ language.0 }}</td>
-        <td>{{ language.1.total }}</td>
-        <td>{{ language.1.translated_count }}</td>
-        <td>{{ language.1.fuzzy_translated_count }}</td>
-        <td>{{ language.1.non_translated_count }}</td>
-        <td>{{ language.1.fuzzy_non_translated_count }}</td>
+        <td>{{ language.language }}</td>
+        <td>{{ language.pot_creation_date }}</td>
+        <td>{{ language.total }}</td>
+        <td>{{ language.translated_count }}</td>
+        <td>{{ language.fuzzy_translated_count }}</td>
+        <td>{{ language.non_translated_count }}</td>
+        <td>{{ language.fuzzy_non_translated_count }}</td>
       </tr>
       <tr>
-        <td colspan="6">
+        <td colspan="7">
           <div class="bars">
-            <div class="bar translated" style="width: {{ language.1.translated_percent }}%"></div>
-            <div class="bar fuzzy-translated" style="width: {{ language.1.fuzzy_translated_percent }}%"></div>
-            <div class="bar non-translated" style="width: {{ language.1.non_translated_percent }}%"></div>
-            <div class="bar fuzzy-non-translated" style="width: {{ language.1.fuzzy_non_translated_percent }}%"></div>
+            <div class="bar translated" style="width: {{ language.translated_percent }}%"></div>
+            <div class="bar fuzzy-translated" style="width: {{ language.fuzzy_translated_percent }}%"></div>
+            <div class="bar non-translated" style="width: {{ language.non_translated_percent }}%"></div>
+            <div class="bar fuzzy-non-translated" style="width: {{ language.fuzzy_non_translated_percent }}%"></div>
           </div>
         </td>
       </tr>
