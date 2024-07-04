@@ -32,14 +32,14 @@ fn main() -> anyhow::Result<()> {
             let catalog = po_file::parse(Path::new(translation))
                 .with_context(|| format!("Could not parse {:?}", &translation))?;
             let stats = counts(&catalog);
-            Ok::<_, anyhow::Error>((catalog.metadata.language, stats))
+            Ok::<_, anyhow::Error>(stats)
         })
         .collect::<Result<Vec<_>, _>>()?;
-    languages.sort_by_key(|(_, stats)| stats.translated_count);
+    languages.sort_by_key(|stats| stats.translated_count);
     languages.reverse();
     let languages = languages
         .into_iter()
-        .map(|(language, stats)| (language, stats.to_context()))
+        .map(|stats| stats.to_context())
         .collect::<Vec<_>>();
 
     let tera = Tera::new("templates/*.html")?;
@@ -54,6 +54,7 @@ fn main() -> anyhow::Result<()> {
 /// Counts of translation message statuses.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct MessageStats {
+    pub language: String,
     pub non_translated_count: u32,
     pub translated_count: u32,
     pub fuzzy_non_translated_count: u32,
@@ -72,6 +73,7 @@ impl MessageStats {
     /// Converts the stats to a map of numbers to be used in context for a Tera template.
     fn to_context(&self) -> BTreeMap<String, Value> {
         let mut context: BTreeMap<String, Value> = BTreeMap::new();
+        context.insert("language".to_string(), self.language.as_str().into());
         context.insert(
             "non_translated_count".to_string(),
             self.non_translated_count.into(),
@@ -108,7 +110,10 @@ impl MessageStats {
 
 /// Returns counts of messages statuses in the given catalog.
 fn counts(catalog: &Catalog) -> MessageStats {
-    let mut stats = MessageStats::default();
+    let mut stats = MessageStats {
+        language: catalog.metadata.language.clone(),
+        ..MessageStats::default()
+    };
     for message in catalog.messages() {
         if message.is_translated() {
             if message.is_fuzzy() {
