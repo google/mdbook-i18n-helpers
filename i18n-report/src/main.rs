@@ -15,10 +15,13 @@
 //! Utility to generate an HTML report about the number of translated messages per language from a
 //! set of PO files.
 
+mod stats;
+
 use anyhow::{bail, Context as _};
-use polib::{catalog::Catalog, po_file};
-use std::{collections::BTreeMap, fs, path::Path};
-use tera::{Context, Tera, Value};
+use polib::po_file;
+use stats::MessageStats;
+use std::{fs, path::Path};
+use tera::{Context, Tera};
 
 const REPORT_TEMPLATE: &str = include_str!("../templates/report.html");
 
@@ -33,7 +36,7 @@ fn main() -> anyhow::Result<()> {
         .map(|translation| {
             let catalog = po_file::parse(Path::new(translation))
                 .with_context(|| format!("Could not parse {:?}", &translation))?;
-            let stats = counts(&catalog);
+            let stats = MessageStats::for_catalog(&catalog);
             Ok::<_, anyhow::Error>(stats)
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -50,89 +53,4 @@ fn main() -> anyhow::Result<()> {
     fs::write(report_file, report)?;
 
     Ok(())
-}
-
-/// Counts of translation message statuses.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct MessageStats {
-    pub language: String,
-    pub pot_creation_date: String,
-    pub non_translated_count: u32,
-    pub translated_count: u32,
-    pub fuzzy_non_translated_count: u32,
-    pub fuzzy_translated_count: u32,
-}
-
-impl MessageStats {
-    /// Returns the total number of messages.
-    fn total(&self) -> u32 {
-        self.non_translated_count
-            + self.translated_count
-            + self.fuzzy_non_translated_count
-            + self.fuzzy_translated_count
-    }
-
-    /// Converts the stats to a map of numbers to be used in context for a Tera template.
-    fn to_context(&self) -> BTreeMap<String, Value> {
-        let mut context: BTreeMap<String, Value> = BTreeMap::new();
-        context.insert("language".to_string(), self.language.as_str().into());
-        context.insert(
-            "pot_creation_date".to_string(),
-            self.pot_creation_date.as_str().into(),
-        );
-        context.insert(
-            "non_translated_count".to_string(),
-            self.non_translated_count.into(),
-        );
-        context.insert("translated_count".to_string(), self.translated_count.into());
-        context.insert(
-            "fuzzy_non_translated_count".to_string(),
-            self.fuzzy_non_translated_count.into(),
-        );
-        context.insert(
-            "fuzzy_translated_count".to_string(),
-            self.fuzzy_translated_count.into(),
-        );
-        context.insert(
-            "non_translated_percent".to_string(),
-            (100.0 * f64::from(self.non_translated_count) / f64::from(self.total())).into(),
-        );
-        context.insert(
-            "translated_percent".to_string(),
-            (100.0 * f64::from(self.translated_count) / f64::from(self.total())).into(),
-        );
-        context.insert(
-            "fuzzy_non_translated_percent".to_string(),
-            (100.0 * f64::from(self.fuzzy_non_translated_count) / f64::from(self.total())).into(),
-        );
-        context.insert(
-            "fuzzy_translated_percent".to_string(),
-            (100.0 * f64::from(self.fuzzy_translated_count) / f64::from(self.total())).into(),
-        );
-        context.insert("total".to_string(), self.total().into());
-        context
-    }
-}
-
-/// Returns counts of messages statuses in the given catalog.
-fn counts(catalog: &Catalog) -> MessageStats {
-    let mut stats = MessageStats {
-        language: catalog.metadata.language.clone(),
-        pot_creation_date: catalog.metadata.pot_creation_date.clone(),
-        ..MessageStats::default()
-    };
-    for message in catalog.messages() {
-        if message.is_translated() {
-            if message.is_fuzzy() {
-                stats.fuzzy_translated_count += 1;
-            } else {
-                stats.translated_count += 1;
-            }
-        } else if message.is_fuzzy() {
-            stats.fuzzy_non_translated_count += 1;
-        } else {
-            stats.non_translated_count += 1;
-        }
-    }
-    stats
 }
