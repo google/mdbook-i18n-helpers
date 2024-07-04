@@ -38,8 +38,8 @@ fn main() -> anyhow::Result<()> {
     languages.sort_by_key(|stats| stats.translated_count);
     languages.reverse();
     let languages = languages
-        .into_iter()
-        .map(|stats| stats.to_context())
+        .iter()
+        .map(MessageStats::to_context)
         .collect::<Vec<_>>();
 
     let tera = Tera::new("templates/*.html")?;
