@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Translation status report</title>
+    <style type="text/css">
+      table { width: 100%; }
+      th { text-align: left; }
+      .bars { display: flex; width: 100%; }
+      .bar { height: 10pt; display: inline-block; }
+      .translated { background-color: green; }
+      .fuzzy-translated { background-color: orange; }
+      .non-translated { background-color: red; }
+      .fuzzy-non-translated { background-color: purple; }
+    </style>
+  </head>
+  <body>
+    <h1>Translation status</h1>
+
+    <table>
+      <tr>
+        <th>Language</th>
+        <th>Last synced</th>
+        <th>Total</th>
+        <th>Translated</th>
+        <th>Fuzzy translated</th>
+        <th>Non-translated</th>
+        <th>Fuzzy non-translated</th>
+      </tr>
+      {% for language in languages %}
+      <tr>
+        <td>{{ language.language }}</td>
+        <td>{{ language.pot_creation_date }}</td>
+        <td>{{ language.total }}</td>
+        <td>{{ language.translated_count }}</td>
+        <td>{{ language.fuzzy_translated_count }}</td>
+        <td>{{ language.non_translated_count }}</td>
+        <td>{{ language.fuzzy_non_translated_count }}</td>
+      </tr>
+      <tr>
+        <td colspan="7">
+          <div class="bars">
+            <div class="bar translated" style="width: {{ language.translated_percent }}%"></div>
+            <div class="bar fuzzy-translated" style="width: {{ language.fuzzy_translated_percent }}%"></div>
+            <div class="bar non-translated" style="width: {{ language.non_translated_percent }}%"></div>
+            <div class="bar fuzzy-non-translated" style="width: {{ language.fuzzy_non_translated_percent }}%"></div>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </body>
+</html>

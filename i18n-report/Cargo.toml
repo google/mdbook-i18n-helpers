@@ -1,0 +1,18 @@
+[package]
+name = "i18n-report"
+version = "0.1.0"
+authors = ["Andrew Walbran <qwandor@google.com>"]
+categories = ["command-line-utilities", "localization"]
+edition = "2021"
+keywords = ["i18n", "translation", "gettext"]
+license = "Apache-2.0"
+repository = "https://github.com/google/mdbook-i18n-helpers"
+description = "Utility to generate an HTML report from a set of PO files."
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+polib.workspace = true
+tera = { version = "1.20.0", default-features = false }
