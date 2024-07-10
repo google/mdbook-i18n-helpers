@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
-
 use polib::catalog::Catalog;
+use std::{
+    collections::BTreeMap,
+    fmt::{self, Display, Formatter},
+};
 use tera::Value;
 
 /// Counts of translation message statuses.
@@ -99,5 +101,20 @@ impl MessageStats {
             }
         }
         stats
+    }
+}
+
+impl Display for MessageStats {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}: {} ({}, {}) / {}, creation date {}",
+            self.language,
+            self.translated_count,
+            self.fuzzy_translated_count,
+            self.fuzzy_non_translated_count,
+            self.total(),
+            self.pot_creation_date,
+        )
     }
 }

@@ -15,10 +15,16 @@ $ cargo install i18n-report
 
 ## Usage
 
-If your PO files are stored under `po/`:
+To generate a status report for the PO files stored under `po/`:
 
 ```shell
-$ i18n-report report.html po/*.po
+$ i18n-report report report.html po/*.po
+```
+
+To print a diff between two sets of translations stored under `old/` and `new/`:
+
+```shell
+$ i18n-report diff old/ new/
 ```
 
 ## License
