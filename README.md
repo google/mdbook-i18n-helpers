@@ -12,6 +12,8 @@ infrastructure for [mdbook](https://github.com/rust-lang/mdBook/):
   for [mdbook](https://github.com/rust-lang/mdBook/)
 - [mdbook-tera-backend](./mdbook-tera-backend/README.md): Tera templates
   extension for [mdbook](https://github.com/rust-lang/mdBook/)'s HTML renderer.
+- [i18n-report](i18n-report/README.md): A tool to generate an HTML report
+  comparing the status of a number of translations.
 
 ## Showcases
 
@@ -28,6 +30,10 @@ Please add your project below if it uses
 - [ezlog documentation](https://s1rius.github.io/ezlog/)
 - [The Cairo Programming Language](https://book.cairo-lang.org/)
 - [The Veryl Hardware Description Language](https://doc.veryl-lang.org/book/)
+
+### i18n-report
+
+- [Comprehensive Rust 🦀](https://google.github.io/comprehensive-rust/translation-report.html)
 
 ## Installation
 
@@ -51,6 +57,14 @@ Run
 
 ```shell
 $ cargo install mdbook-tera-backend
+```
+
+### `i18n-report`
+
+Run
+
+```shell
+$ cargo install i18n-report
 ```
 
 ## Contact
