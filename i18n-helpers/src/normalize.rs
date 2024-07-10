@@ -248,17 +248,19 @@ pub fn normalize(catalog: Catalog) -> anyhow::Result<Catalog> {
                 message.source_mut().push('\n');
                 message.source_mut().push_str(new_message.source());
             }
-            None => new_catalog.append_or_update(new_message)
+            None => new_catalog.append_or_update(new_message),
         }
     }
 
     // Increment POT-Creation-Date in metadata by 1 minute to indicate a change in the file.
+    // Do not change the date if parsing or advancing the date fails.
     if let Ok(pot_creation_date) = dateparser::parse(&new_catalog.metadata.pot_creation_date) {
-        new_catalog.metadata.pot_creation_date = pot_creation_date
-            .checked_add_signed(Duration::minutes(1))
-            .ok_or(anyhow::Error::msg("could not advance POT-Creation-Date"))?
-            .format("%Y-%m-%d %H:%M%z")
-            .to_string();
+        if let Some(new_pot_creation_date) =
+            pot_creation_date.checked_add_signed(Duration::minutes(1))
+        {
+            new_catalog.metadata.pot_creation_date =
+                new_pot_creation_date.format("%Y-%m-%d %H:%M%z").to_string();
+        }
     }
 
     Ok(new_catalog)
@@ -582,6 +584,20 @@ mod tests {
         let mut catalog = create_catalog(&[]);
         catalog.metadata.pot_creation_date = String::from("2008-02-06 16:25+0000");
         let new_catalog = normalize(catalog).expect("could not advance POT-Creation-Date");
-        assert_eq!(new_catalog.metadata.pot_creation_date, String::from("2008-02-06 16:26+0000"))
+        assert_eq!(
+            new_catalog.metadata.pot_creation_date,
+            String::from("2008-02-06 16:26+0000")
+        )
+    }
+    
+    #[test]
+    fn test_normalize_pot_creation_date_parsing_fails() {
+        let mut catalog = create_catalog(&[]);
+        catalog.metadata.pot_creation_date = String::from("not a valid date");
+        let new_catalog = normalize(catalog).expect("could not advance POT-Creation-Date");
+        assert_eq!(
+            new_catalog.metadata.pot_creation_date,
+            String::from("not a valid date")
+        )
     }
 }
