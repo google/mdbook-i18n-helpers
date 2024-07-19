@@ -235,10 +235,10 @@ where
                     .entry(destination.clone())
                     .or_insert_with(|| Catalog::new(generate_catalog_metadata(ctx)));
 
-                let source = ctx.config.book.src.join(&source);
+                let path = ctx.config.book.src.join(&source);
                 for (lineno, extracted) in extract_messages(&content) {
                     let msgid = extracted.message;
-                    let source = format!("{}:{}", source.display(), lineno);
+                    let source = build_source(&path, lineno, granularity);
                     add_message(catalog, &msgid, &source, &extracted.comment);
                 }
             }
