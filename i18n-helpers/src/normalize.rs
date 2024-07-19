@@ -589,7 +589,7 @@ mod tests {
             String::from("2008-02-06 16:26+0000")
         )
     }
-    
+
     #[test]
     fn test_normalize_pot_creation_date_parsing_fails() {
         let mut catalog = create_catalog(&[]);
