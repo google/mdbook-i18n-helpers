@@ -704,7 +704,71 @@ mod tests {
 
         Ok(())
     }
+    #[test]
 
+    fn test_create_catalog_nested_directories_respects_granularity() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 granularity=0",
+            ),
+            (
+                "src/SUMMARY.md",
+                "- [The Foo Chapter](foo.md)\n\
+                \t- [The Bar Section](foo/bar.md)\n\
+                \t\t- [The Baz Subsection](foo/bar/baz.md)",
+            ),
+            (
+                "src/foo.md",
+                "# How to Foo\n\
+                 \n\
+                 The first paragraph about Foo.\n",
+            ),
+            (
+                "src/foo/bar.md",
+                "# How to Bar\n\
+                 \n\
+                 The first paragraph about Bar.\n",
+            ),
+            (
+                "src/foo/bar/baz.md",
+                "# How to Baz\n\
+                 \n\
+                 The first paragraph about Baz.\n",
+            ),
+        ])?;
+
+        let catalogs = create_catalogs(&ctx, std::fs::read_to_string)?;
+        let catalog = &catalogs[&default_template_file()];
+
+        for msg in catalog.messages() {
+            assert!(!msg.is_translated());
+        }
+
+        let expected_message_tuples = vec![
+            ("src/SUMMARY.md", "The Foo Chapter"),
+            ("src/SUMMARY.md", "The Bar Section"),
+            ("src/SUMMARY.md", "The Baz Subsection"),
+            ("src/foo.md", "How to Foo"),
+            ("src/foo.md", "The first paragraph about Foo."),
+            ("src/foo/bar.md", "How to Bar"),
+            ("src/foo/bar.md", "The first paragraph about Bar."),
+            ("src/foo/bar/baz.md", "How to Baz"),
+            ("src/foo/bar/baz.md", "The first paragraph about Baz."),
+        ];
+
+        let message_tuples = catalog
+            .messages()
+            .map(|msg| (msg.source(), msg.msgid()))
+            .collect::<Vec<(&str, &str)>>();
+
+        assert_eq!(expected_message_tuples, message_tuples);
+
+        Ok(())
+    }
+ 
     #[test]
     fn test_split_catalog_nested_directories_depth_1() -> anyhow::Result<()> {
         let (ctx, _tmp) = create_render_context(&[
