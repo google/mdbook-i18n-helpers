@@ -768,7 +768,7 @@ mod tests {
 
         Ok(())
     }
- 
+
     #[test]
     fn test_split_catalog_nested_directories_depth_1() -> anyhow::Result<()> {
         let (ctx, _tmp) = create_render_context(&[
