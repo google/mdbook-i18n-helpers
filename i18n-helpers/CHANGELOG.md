@@ -2,7 +2,13 @@
 
 This lists the most important changes between releases of mdbook-i18n-helpers.
 
-## Version 0.3.4 (2024-05-26)
+## Version 0.3.5 (2024-07-23)
+
+- [#208]: Trim dependencies by @klensy
+- [#212]: Advance POT-Creation-Date by 1 minute by @carreter
+- [#215]: Fix granularity in sub-chapters by @carreter
+
+## Version 0.3.4 (2024-06-14)
 
 - [#203] : Fix removal of links by @dalance
 
@@ -77,6 +83,9 @@ add [more controls][#76] for this in the future.
 
 First release as a stand-alone crate.
 
+[#215]: https://github.com/google/mdbook-i18n-helpers/pull/215
+[#212]: https://github.com/google/mdbook-i18n-helpers/pull/212
+[#208]: https://github.com/google/mdbook-i18n-helpers/pull/208
 [#203]: https://github.com/google/mdbook-i18n-helpers/pull/203
 [#195]: https://github.com/google/mdbook-i18n-helpers/pull/195
 [#193]: https://github.com/google/mdbook-i18n-helpers/pull/193
