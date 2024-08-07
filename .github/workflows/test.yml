@@ -23,11 +23,16 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - name: Validate Cargo.lock is up-to-date
+        run: |
+          cargo check --workspace
+          git diff --exit-code
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests with Coverage report enabled
-        run: cargo llvm-cov test --all-features --workspace --codecov --output-path codecov_report.json
+        run: cargo llvm-cov test --all-features --workspace --codecov --locked --output-path codecov_report.json
 
       - name: Store PR number and commit SHA
         run: |
