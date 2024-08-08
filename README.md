@@ -30,6 +30,7 @@ Please add your project below if it uses
 - [ezlog documentation](https://s1rius.github.io/ezlog/)
 - [The Cairo Programming Language](https://book.cairo-lang.org/)
 - [The Veryl Hardware Description Language](https://doc.veryl-lang.org/book/)
+- [Rust By Example](https://github.com/rust-lang/rust-by-example)
 
 ### i18n-report
 
