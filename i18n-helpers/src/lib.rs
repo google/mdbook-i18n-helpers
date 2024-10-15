@@ -93,27 +93,27 @@ pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
 /// );
 /// ```
 pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize, Event<'a>)> {
-    // Expand a `[foo]` style link into `[foo][foo]`.
+    // Expand a `[foo]` style links into inline links like `[foo](url)`
     fn expand_shortcut_link(tag: Tag<'_>) -> Tag<'_> {
         match tag {
             Tag::Link {
-                link_type: LinkType::Shortcut,
+                link_type: LinkType::Shortcut | LinkType::Collapsed | LinkType::Reference,
                 dest_url,
                 title,
                 id,
             } => Tag::Link {
-                link_type: LinkType::Reference,
+                link_type: LinkType::Inline,
                 dest_url,
                 title,
                 id,
             },
             Tag::Image {
-                link_type: LinkType::Shortcut,
+                link_type: LinkType::Shortcut | LinkType::Collapsed | LinkType::Reference,
                 dest_url,
                 title,
                 id,
             } => Tag::Image {
-                link_type: LinkType::Reference,
+                link_type: LinkType::Inline,
                 dest_url,
                 title,
                 id,
