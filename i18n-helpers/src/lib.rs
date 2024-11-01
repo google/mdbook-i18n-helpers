@@ -133,7 +133,7 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
         // If we're in a code block, we disable the normal parsing and
         // return lines of text. This matches the behavior of the
         // parser in this case.
-        Some(state) if state.is_in_code_block => text
+        Some(state) if state.is_in_code_block() => text
             .split_inclusive('\n')
             .enumerate()
             .map(|(idx, line)| (idx + 1, Event::Text(line.into())))
