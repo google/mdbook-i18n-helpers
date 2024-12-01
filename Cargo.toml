@@ -14,4 +14,4 @@ mdbook = { version = "0.4.37", default-features = false }
 polib = "0.2.0"
 pretty_assertions = "1.4.1"
 serde_json = "1.0.132"
-tempfile = "3.13.0"
+tempfile = "3.14.0"
