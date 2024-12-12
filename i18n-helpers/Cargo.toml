@@ -19,7 +19,7 @@ dateparser = "0.2.1"
 mdbook.workspace = true
 polib.workspace = true
 pulldown-cmark = { version = "0.12.2", default-features = false, features = ["html"] }
-pulldown-cmark-to-cmark = "18.0.0"
+pulldown-cmark-to-cmark = "19.0.1"
 regex = "1.11"
 semver = "1.0.23"
 serde_json.workspace = true
