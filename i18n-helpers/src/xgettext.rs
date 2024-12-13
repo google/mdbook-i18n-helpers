@@ -15,16 +15,20 @@
 //! This file contains main logic used by the binary `mdbook-xgettext`.
 
 use std::collections::HashMap;
-use std::{io, path};
+use std::io;
+use std::path::{Path, PathBuf};
 
 use super::{extract_events, extract_messages, reconstruct_markdown, wrap_sources};
 use anyhow::{anyhow, Context};
 use mdbook::renderer::RenderContext;
 use mdbook::{book, BookItem};
+use paths::UniquePathBuilder;
 use polib::catalog::Catalog;
 use polib::message::{Message, MessageMutView, MessageView};
 use polib::metadata::CatalogMetadata;
 use pulldown_cmark::{Event, Tag, TagEnd};
+
+const POT_EXTENSION: &str = "pot";
 
 /// Strip an optional link from a Markdown string.
 fn strip_link(text: &str) -> String {
@@ -65,7 +69,7 @@ fn add_message(catalog: &mut Catalog, msgid: &str, source: &str, comment: &str) 
 ///   `foo.md:20`, etc.
 ///
 /// This can help reduce number of updates to your PO files.
-fn build_source<P: AsRef<path::Path>>(path: P, lineno: usize, granularity: usize) -> String {
+fn build_source<P: AsRef<Path>>(path: P, lineno: usize, granularity: usize) -> String {
     let path = path.as_ref();
     match granularity {
         0 => format!("{}", path.display()),
@@ -112,9 +116,9 @@ fn generate_catalog_metadata(ctx: &RenderContext) -> CatalogMetadata {
 pub fn create_catalogs<F>(
     ctx: &RenderContext,
     summary_reader: F,
-) -> anyhow::Result<HashMap<path::PathBuf, Catalog>>
+) -> anyhow::Result<HashMap<PathBuf, Catalog>>
 where
-    F: Fn(path::PathBuf) -> io::Result<String>,
+    F: Fn(PathBuf) -> io::Result<String>,
 {
     let metadata = generate_catalog_metadata(ctx);
     let mut catalog = Catalog::new(metadata);
@@ -178,63 +182,34 @@ where
     // `summary.pot` file for a depth of 1, or exist within in a
     // `summary.pot` file within the default directory for chapters
     // without a corresponding part title.
-    let mut current_top_level = "summary".to_owned();
-    let mut summary_destination = match depth {
-        0 => path::PathBuf::from("messages"),
-        1 => path::PathBuf::from("summary"),
-        _ => path::PathBuf::from(&current_top_level).join("summary"),
-    };
-    let _: bool = summary_destination.set_extension("pot");
-    catalogs.insert(summary_destination, catalog);
+    let mut unique_path_builder = UniquePathBuilder::new(depth);
+    unique_path_builder.maybe_push("summary");
+    unique_path_builder.maybe_push("summary");
+    catalogs.insert(unique_path_builder.get(), catalog);
+    unique_path_builder.maybe_pop();
 
-    // Next, we add the chapter contents.
+    // Next, we add the part-title and chapter contents.
     for item in &ctx.book.sections {
         if let BookItem::PartTitle(title) = item {
             // Iterating through the book in section-order, the
-            // PartTitle represents the 'section' that each chapter
+            // `PartTitle` represents the 'section' that each chapter
             // exists within.
-            current_top_level = slug(title);
+
+            // Exit current part title and enter the new one.
+            unique_path_builder.maybe_pop();
+            unique_path_builder.maybe_push(title);
         } else if let BookItem::Chapter(chapter) = item {
-            let path = match &chapter.path {
-                Some(path) => ctx.config.book.src.join(path),
-                None => continue,
-            };
-            let directory = match depth {
-                0 => path::PathBuf::from("messages"),
-                1 => path::PathBuf::from(current_top_level.clone()),
-                // The current chapter is already at depth 2, so
-                // append the chapter's name for depths greater than
-                // 1.
-                _ => path::PathBuf::from(current_top_level.clone()).join(slug(&chapter.name)),
-            };
-
-            // Add the (destination, catalog) to the map if it doesn't
-            // yet exist, so messages can be appended to the catalog.
-            let mut destination = directory.clone();
-            let _: bool = destination.set_extension("pot");
-            let catalog = catalogs
-                .entry(destination.clone())
-                .or_insert_with(|| Catalog::new(generate_catalog_metadata(ctx)));
-
-            for (lineno, extracted) in extract_messages(&chapter.content) {
-                let msgid = extracted.message;
-                let source = build_source(&path, lineno, granularity);
-                add_message(catalog, &msgid, &source, &extracted.comment);
-            }
-
             // Add the contents for all of the sub-chapters within the
             // current chapter.
             for Chapter {
                 content,
                 source,
-                mut destination,
-            } in get_subcontent_for_chapter(chapter, directory, depth, 2)
+                destination,
+            } in get_subcontent_for_chapter(chapter, &mut unique_path_builder)
             {
-                let _: bool = destination.set_extension("pot");
                 let catalog = catalogs
-                    .entry(destination.clone())
-                    .or_insert_with(|| Catalog::new(generate_catalog_metadata(ctx)));
-
+                    .entry(destination)
+                    .or_insert(Catalog::new(generate_catalog_metadata(ctx)));
                 let path = ctx.config.book.src.join(&source);
                 for (lineno, extracted) in extract_messages(&content) {
                     let msgid = extracted.message;
@@ -244,6 +219,7 @@ where
             }
         }
     }
+
     catalogs
         .iter_mut()
         .for_each(|(_key, catalog)| dedup_sources(catalog));
@@ -257,79 +233,184 @@ struct Chapter {
     /// The chapter's content.
     content: String,
     /// The file where the content is sourced.
-    source: path::PathBuf,
+    source: PathBuf,
     /// The output destination for the polib template.
-    destination: path::PathBuf,
+    destination: PathBuf,
 }
 
 // A recursive function to crawl a chapter's sub-items and get the
 // relevant info to produce a set of po template files.
 fn get_subcontent_for_chapter(
-    c: &book::Chapter,
-    provided_file_path: path::PathBuf,
-    provided_depth: usize,
-    depth: usize,
+    chapter: &book::Chapter,
+    unique_path_builder: &mut UniquePathBuilder,
 ) -> Vec<Chapter> {
-    if c.sub_items.is_empty() {
-        return Vec::new();
-    };
+    // Enter current chapter.
+    unique_path_builder.maybe_push(&chapter.name);
 
-    // Iterate through sub-chapters and pull the chapter content,
-    // path, and destination to store the template.
-    c.sub_items
-        .iter()
-        .filter_map(|item| {
-            let BookItem::Chapter(chapter) = item else {
-                return None;
-            };
-            let (chapter_info, new_path) = match &chapter.path {
-                Some(chapter_path) => {
-                    // Append the chapter's name to the template's
-                    // destination when the depth has not surpassed
-                    // the provided value.
-                    let destination = if depth < provided_depth {
-                        provided_file_path.join(slug(&chapter.name))
-                    } else {
-                        provided_file_path.clone()
-                    };
+    let chapter_info = chapter.path.as_ref().map(|path| Chapter {
+        content: chapter.content.clone(),
+        source: path.clone(),
+        destination: unique_path_builder.get(),
+    });
 
-                    let info = Chapter {
-                        content: chapter.content.clone(),
-                        source: chapter_path.clone(),
-                        destination: destination.clone(),
-                    };
-                    (Some(info), destination)
-                }
-                None => (None, provided_file_path.clone()),
-            };
+    // Recursively call to get sub-chapter contents.
+    let sub_chapter_info = chapter_info
+        .into_iter()
+        .chain(chapter.sub_items.iter().flat_map(|item| {
+            if let BookItem::Chapter(c) = item {
+                get_subcontent_for_chapter(c, unique_path_builder)
+            } else {
+                Vec::new()
+            }
+        }))
+        .collect();
 
-            // Recursively call to get sub-chapter contents.
-            Some(chapter_info.into_iter().chain(get_subcontent_for_chapter(
-                chapter,
-                new_path,
-                provided_depth,
-                depth + 1,
-            )))
-        })
-        .flatten()
-        .collect()
+    // Exit chapter.
+    unique_path_builder.maybe_pop();
+    sub_chapter_info
 }
 
-// Trim a string slice to only contain alphanumeric characters and
-// dashes.
-fn slug(title: &str) -> String {
-    // Specially handle "C++" to format it as "cpp" instead of "c".
-    let title = title.to_lowercase().replace("c++", "cpp");
-    title
-        .split_whitespace()
-        .map(|word| {
-            word.chars()
-                .filter(|&ch| ch == '-' || ch.is_ascii_alphanumeric())
-                .collect::<String>()
-        })
-        .filter(|word| !word.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
+pub mod paths {
+    use super::POT_EXTENSION;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    pub struct UniquePathBuilder {
+        current_path: PathBuf,
+        current_depth: usize,
+        max_depth: usize,
+        frequency_map: HashMap<PathBuf, usize>,
+    }
+
+    /// Mimics the `push` and `pop` functionalities of `std::path::PathBuf`
+    /// with, respectively, the [`maybe_push`] and [`maybe_pop`] methods,
+    /// so that:
+    ///
+    /// 1. The path is never extended past `max_depth` depth.
+    /// 2. Whenever [`maybe_push`] is invoked, the base directory/file of
+    ///    the path is potentially altered to make the path unique among
+    ///    the ones produced thus far.
+    /// 3. All strings passed to [`maybe_push`] are normalized by retaining
+    ///    only non-alphabetic characters and hyphens.
+    ///
+    /// The disambiguation is deterministic (i.e., the same sequence of
+    /// operation is guaranteed to always produce the same paths) and not
+    /// based on randomization, therefore its stability doesn't depend on
+    /// the stability of external libraries.
+    ///
+    /// The [`get`] method returns the current path with a .pot extension.
+    ///
+    /// The spacial case of `depth` equal to 0 is treated differently by
+    /// returning the `DEFAULT_DEPTH_0`.pot filename.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use mdbook_i18n_helpers::xgettext::paths::UniquePathBuilder;
+    ///
+    ///
+    /// let mut unique_path_builder = UniquePathBuilder::new(2);
+    ///
+    /// fn get_str(pb: &UniquePathBuilder) -> String {
+    ///     pb.get().to_str().unwrap().into()
+    /// }
+    ///
+    /// unique_path_builder.maybe_push("foo"); // Pushes "foo"
+    /// unique_path_builder.maybe_push("bar"); // Pushes "bar"
+    /// assert_eq!(get_str(&unique_path_builder), "foo/bar.pot");
+    ///
+    /// unique_path_builder.maybe_push("baz"); // No-op for the user
+    /// assert_eq!(get_str(&unique_path_builder), "foo/bar.pot");
+    ///
+    /// unique_path_builder.maybe_pop(); // No-op
+    /// unique_path_builder.maybe_pop(); // Pops "bar"
+    /// unique_path_builder.maybe_pop(); // Pops "foo"
+    /// unique_path_builder.maybe_push("foo"); // Pushes "foo_1"
+    /// unique_path_builder.maybe_push("bar"); // Pushes "bar"
+    /// unique_path_builder.maybe_pop(); // Pops "bar"
+    /// unique_path_builder.maybe_push("bar"); // Pushes "bar_1"
+    /// assert_eq!(get_str(&unique_path_builder), "foo_1/bar_1.pot");
+    /// ```
+    impl UniquePathBuilder {
+        const DEFAULT_DEPTH_0: &str = "messages";
+
+        pub fn new(max_depth: usize) -> Self {
+            Self {
+                current_path: PathBuf::new(),
+                current_depth: 0,
+                max_depth,
+                frequency_map: HashMap::new(),
+            }
+        }
+
+        fn format_path_with_counter(&self) -> PathBuf {
+            match self.frequency_map.get(&self.current_path) {
+                None | Some(&0) => self.current_path.clone(),
+                Some(&cnt) => {
+                    let mut file_name = self.current_path.file_name().unwrap().to_os_string();
+                    file_name.push(format!("_{}", cnt));
+                    self.current_path.with_file_name(file_name)
+                }
+            }
+        }
+
+        pub fn get(&self) -> PathBuf {
+            if self.max_depth == 0 || self.current_depth == 0 {
+                PathBuf::from(Self::DEFAULT_DEPTH_0).with_extension(POT_EXTENSION)
+            } else {
+                self.format_path_with_counter()
+                    .with_extension(POT_EXTENSION)
+            }
+        }
+
+        pub fn maybe_push<T: AsRef<str>>(&mut self, s: T) {
+            self.current_depth += 1;
+            if self.current_depth > self.max_depth {
+                return; // Exceeded max depth, do nothing.
+            }
+            // Extend current path with new component.
+            self.current_path = self.format_path_with_counter();
+            self.current_path.push(slug(s.as_ref()));
+            // Update frequency of new path.
+            self.frequency_map
+                .entry(self.current_path.clone())
+                .and_modify(|cnt| *cnt += 1)
+                .or_insert(0);
+        }
+
+        pub fn maybe_pop(&mut self) {
+            if self.current_depth == 0 {
+                return; // Maybe panic instead?
+            }
+            if self.current_depth <= self.max_depth {
+                self.current_path.pop();
+            }
+            self.current_depth -= 1;
+        }
+    }
+
+    // Trim a string slice to only contain alphanumeric characters and
+    // dashes.
+    // If the resulting string is empty, returns "null" instead.
+    fn slug(title: &str) -> String {
+        // Specially handle "C++" to format it as "cpp" instead of "c".
+        let title = title.to_lowercase().replace("c++", "cpp");
+        let title = title
+            .split_whitespace()
+            .map(|word| {
+                word.chars()
+                    .filter(|&ch| ch == '-' || ch.is_ascii_alphanumeric())
+                    .collect::<String>()
+            })
+            .filter(|word| !word.is_empty())
+            .collect::<Vec<_>>()
+            .join("-");
+        if title.is_empty() {
+            String::from("null")
+        } else {
+            title
+        }
+    }
 }
 
 #[cfg(test)]
@@ -366,8 +447,8 @@ mod tests {
         Ok((ctx, tmpdir))
     }
 
-    fn default_template_file() -> path::PathBuf {
-        path::PathBuf::from("messages.pot")
+    fn default_template_file() -> PathBuf {
+        PathBuf::from("messages.pot")
     }
 
     #[test]
@@ -799,7 +880,7 @@ mod tests {
 
         let expected_message_tuples = HashMap::from([
             (
-                path::PathBuf::from("summary.pot"),
+                PathBuf::from("summary.pot"),
                 vec![
                     "src/SUMMARY.md:1",
                     "src/SUMMARY.md:3",
@@ -812,7 +893,7 @@ mod tests {
                 ],
             ),
             (
-                path::PathBuf::from("foo.pot"),
+                PathBuf::from("foo.pot"),
                 vec![
                     "src/foo.md:1",
                     "src/foo/bar.md:1",
@@ -867,7 +948,7 @@ mod tests {
 
         let expected_message_tuples = HashMap::from([
             (
-                path::PathBuf::from("summary/summary.pot"),
+                PathBuf::from("summary/summary.pot"),
                 vec![
                     "src/SUMMARY.md:1",
                     "src/SUMMARY.md:3",
@@ -878,16 +959,13 @@ mod tests {
                     "src/SUMMARY.md:9",
                 ],
             ),
+            (PathBuf::from("summary/intro.pot"), vec!["src/index.md:1"]),
             (
-                path::PathBuf::from("summary/intro.pot"),
-                vec!["src/index.md:1"],
-            ),
-            (
-                path::PathBuf::from("foo/the-foo-chapter.pot"),
+                PathBuf::from("foo/the-foo-chapter.pot"),
                 vec!["src/foo.md:1", "src/foo/bar.md:1", "src/foo/bar/baz.md:1"],
             ),
             (
-                path::PathBuf::from("foo/foo-exercises.pot"),
+                PathBuf::from("foo/foo-exercises.pot"),
                 vec!["src/exercises/foo.md:1"],
             ),
         ]);
@@ -937,7 +1015,7 @@ mod tests {
 
         let expected_message_tuples = HashMap::from([
             (
-                path::PathBuf::from("summary/summary.pot"),
+                PathBuf::from("summary/summary.pot"),
                 vec![
                     "src/SUMMARY.md:1",
                     "src/SUMMARY.md:3",
@@ -948,20 +1026,17 @@ mod tests {
                     "src/SUMMARY.md:9",
                 ],
             ),
+            (PathBuf::from("summary/intro.pot"), vec!["src/index.md:1"]),
             (
-                path::PathBuf::from("summary/intro.pot"),
-                vec!["src/index.md:1"],
-            ),
-            (
-                path::PathBuf::from("foo/the-foo-chapter.pot"),
+                PathBuf::from("foo/the-foo-chapter.pot"),
                 vec!["src/foo.md:1"],
             ),
             (
-                path::PathBuf::from("foo/the-foo-chapter/the-bar-section.pot"),
+                PathBuf::from("foo/the-foo-chapter/the-bar-section.pot"),
                 vec!["src/foo/bar.md:1", "src/foo/bar/baz.md:1"],
             ),
             (
-                path::PathBuf::from("foo/foo-exercises.pot"),
+                PathBuf::from("foo/foo-exercises.pot"),
                 vec!["src/exercises/foo.md:1"],
             ),
         ]);
@@ -1011,7 +1086,7 @@ mod tests {
 
         let expected_message_tuples = HashMap::from([
             (
-                path::PathBuf::from("summary/summary.pot"),
+                PathBuf::from("summary/summary.pot"),
                 vec![
                     "src/SUMMARY.md:1",
                     "src/SUMMARY.md:3",
@@ -1022,24 +1097,21 @@ mod tests {
                     "src/SUMMARY.md:9",
                 ],
             ),
+            (PathBuf::from("summary/intro.pot"), vec!["src/index.md:1"]),
             (
-                path::PathBuf::from("summary/intro.pot"),
-                vec!["src/index.md:1"],
-            ),
-            (
-                path::PathBuf::from("foo/the-foo-chapter.pot"),
+                PathBuf::from("foo/the-foo-chapter.pot"),
                 vec!["src/foo.md:1"],
             ),
             (
-                path::PathBuf::from("foo/the-foo-chapter/the-bar-section.pot"),
+                PathBuf::from("foo/the-foo-chapter/the-bar-section.pot"),
                 vec!["src/foo/bar.md:1"],
             ),
             (
-                path::PathBuf::from("foo/the-foo-chapter/the-bar-section/the-baz-subsection.pot"),
+                PathBuf::from("foo/the-foo-chapter/the-bar-section/the-baz-subsection.pot"),
                 vec!["src/foo/bar/baz.md:1"],
             ),
             (
-                path::PathBuf::from("foo/foo-exercises.pot"),
+                PathBuf::from("foo/foo-exercises.pot"),
                 vec!["src/exercises/foo.md:1"],
             ),
         ]);
@@ -1092,7 +1164,7 @@ mod tests {
 
         let expected_message_tuples = HashMap::from([
             (
-                path::PathBuf::from("summary/summary.pot"),
+                PathBuf::from("summary/summary.pot"),
                 vec![
                     "src/SUMMARY.md:1",
                     "src/SUMMARY.md:3",
@@ -1103,26 +1175,90 @@ mod tests {
                     "src/SUMMARY.md:9",
                 ],
             ),
+            (PathBuf::from("summary/intro.pot"), vec!["src/index.md:1"]),
             (
-                path::PathBuf::from("summary/intro.pot"),
-                vec!["src/index.md:1"],
-            ),
-            (
-                path::PathBuf::from("foo/the-foo-chapter.pot"),
+                PathBuf::from("foo/the-foo-chapter.pot"),
                 vec!["src/foo.md:1"],
             ),
             (
-                path::PathBuf::from("foo/the-foo-chapter/the-bar-section.pot"),
+                PathBuf::from("foo/the-foo-chapter/the-bar-section.pot"),
                 vec!["src/foo/bar.md:1"],
             ),
             (
-                path::PathBuf::from("foo/the-foo-chapter/the-bar-section/the-baz-subsection.pot"),
+                PathBuf::from("foo/the-foo-chapter/the-bar-section/the-baz-subsection.pot"),
                 vec!["src/foo/bar/baz.md:1"],
             ),
             (
-                path::PathBuf::from("foo/foo-exercises.pot"),
+                PathBuf::from("foo/foo-exercises.pot"),
                 vec!["src/exercises/foo.md:1"],
             ),
+        ]);
+
+        assert_eq!(expected_message_tuples.keys().len(), catalogs.len());
+        for (file_path, catalog) in catalogs {
+            let expected_msgids = &expected_message_tuples[&file_path];
+            assert_eq!(
+                &catalog
+                    .messages()
+                    .map(|msg| msg.source())
+                    .collect::<Vec<_>>(),
+                expected_msgids
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_split_catalog_parts_with_identical_name() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 depth = 1",
+            ),
+            (
+                "src/SUMMARY.md",
+                "# Summary\n\n\
+                 - [Intro](index.md)\n\n\
+                 # Foo\n\n\
+                 - [The Foo Chapter](foo.md)\n\
+                 - [The Bar Chapter](bar.md)\n\n\
+                 # Foo\n\n\
+                 - [The Foo Chapter IS BACK!](foo-back.md)\n\n\
+                 # Foo\n\n\
+                 - [Foo Chapter Again???](oh-no-foo-again.md)",
+            ),
+            ("src/index.md", "# Intro to X"),
+            ("src/foo.md", "# How to Foo"),
+            ("src/bar.md", "# How to Bar"),
+            ("src/foo-back.md", "# How to Foo Again"),
+            ("src/oh-no-foo-again.md", "# Stop the Foo"),
+        ])?;
+
+        let catalogs = create_catalogs(&ctx, std::fs::read_to_string)?;
+
+        let expected_message_tuples = HashMap::from([
+            (
+                PathBuf::from("summary.pot"),
+                vec![
+                    "src/SUMMARY.md:1",
+                    "src/SUMMARY.md:3",
+                    "src/SUMMARY.md:5 src/SUMMARY.md:10 src/SUMMARY.md:14",
+                    "src/SUMMARY.md:7",
+                    "src/SUMMARY.md:8",
+                    "src/SUMMARY.md:12",
+                    "src/SUMMARY.md:16",
+                    "src/index.md:1",
+                ],
+            ),
+            (
+                PathBuf::from("foo.pot"),
+                vec!["src/foo.md:1", "src/bar.md:1"],
+            ),
+            (PathBuf::from("foo_1.pot"), vec!["src/foo-back.md:1"]),
+            (PathBuf::from("foo_2.pot"), vec!["src/oh-no-foo-again.md:1"]),
         ]);
 
         assert_eq!(expected_message_tuples.keys().len(), catalogs.len());
