@@ -15,11 +15,13 @@
 //! This file contains main logic used by the binary `mdbook-gettext`.
 
 use super::{extract_events, reconstruct_markdown, translate_events};
+use anyhow::Context;
 use mdbook::book::Book;
 use mdbook::BookItem;
 use polib::catalog::Catalog;
 use polib::message::Message;
 use pulldown_cmark::Event;
+use pulldown_cmark_to_cmark::Error as CmarkError;
 
 /// Strip formatting from a Markdown string.
 ///
@@ -38,11 +40,21 @@ fn strip_formatting(text: &str) -> String {
         .collect()
 }
 
-fn translate(text: &str, catalog: &Catalog) -> String {
+fn translate(text: &str, catalog: &Catalog) -> anyhow::Result<String> {
     let events = extract_events(text, None);
-    let translated_events = translate_events(&events, catalog);
-    let (translated, _) = reconstruct_markdown(&translated_events, None);
-    translated
+    // Translation should always succeed.
+    let translated_events =
+        translate_events(&events, catalog).expect("Fatal: failed to translate events");
+    let (translated, _) = reconstruct_markdown(&translated_events, None)
+        .map_err(|e| match e {
+            CmarkError::FormatFailed(_) => e.into(),
+            CmarkError::UnexpectedEvent => anyhow::Error::from(e).context(
+                "Markdown in translated messages (.po) may not be consistent with the original",
+            ),
+        })
+        .context("Failed to reconstruct Markdown after translation")?;
+    // "Failed to reconstruct Markdown after translation"
+    Ok(translated)
 }
 
 /// Update `catalog` with stripped messages from `SUMMARY.md`.
@@ -75,18 +87,29 @@ pub fn add_stripped_summary_translations(catalog: &mut Catalog) {
     }
 }
 
-/// Translate an entire book.
-pub fn translate_book(catalog: &Catalog, book: &mut Book) {
-    book.for_each_mut(|item| match item {
+fn mutate_item(item: &mut BookItem, catalog: &Catalog) -> anyhow::Result<()> {
+    match item {
         BookItem::Chapter(ch) => {
-            ch.content = translate(&ch.content, catalog);
-            ch.name = translate(&ch.name, catalog);
+            ch.content = translate(&ch.content, catalog)?;
+            ch.name = translate(&ch.name, catalog)?;
         }
         BookItem::Separator => {}
         BookItem::PartTitle(title) => {
-            *title = translate(title, catalog);
+            *title = translate(title, catalog)?;
         }
-    });
+    };
+    Ok(())
+}
+
+/// Translate an entire book.
+pub fn translate_book(catalog: &Catalog, book: &mut Book) -> anyhow::Result<()> {
+    // Unfortunately the `Book` API only allows to mutate *all* the items
+    // through a clousure, with no early bail-out in case of error.
+    // Therefore, let's just collect all the results and return the first error
+    // or `Ok(())`.
+    let mut results = Vec::<anyhow::Result<()>>::new();
+    book.for_each_mut(|item| results.push(mutate_item(item, catalog)));
+    results.into_iter().find(|r| r.is_err()).unwrap_or(Ok(()))
 }
 
 #[cfg(test)]
@@ -106,6 +129,14 @@ mod tests {
             catalog.append_or_update(message);
         }
         catalog
+    }
+
+    fn create_book(items: Vec<BookItem>) -> Book {
+        let mut book = Book::new();
+        items.into_iter().for_each(|item| {
+            book.push_item(item);
+        });
+        book
     }
 
     #[test]
@@ -142,28 +173,28 @@ mod tests {
     #[test]
     fn test_translate_single_line() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
-        assert_eq!(translate("foo bar", &catalog), "FOO BAR");
+        assert_eq!(translate("foo bar", &catalog).unwrap(), "FOO BAR");
     }
 
     #[test]
     fn test_translate_single_paragraph() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
         // The output is normalized so the newline disappears.
-        assert_eq!(translate("foo bar\n", &catalog), "FOO BAR");
+        assert_eq!(translate("foo bar\n", &catalog).unwrap(), "FOO BAR");
     }
 
     #[test]
     fn test_translate_paragraph_with_leading_newlines() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
         // The output is normalized so the newlines disappear.
-        assert_eq!(translate("\n\n\nfoo bar\n", &catalog), "FOO BAR");
+        assert_eq!(translate("\n\n\nfoo bar\n", &catalog).unwrap(), "FOO BAR");
     }
 
     #[test]
     fn test_translate_paragraph_with_trailing_newlines() {
         let catalog = create_catalog(&[("foo bar", "FOO BAR")]);
         // The output is normalized so the newlines disappear.
-        assert_eq!(translate("foo bar\n\n\n", &catalog), "FOO BAR");
+        assert_eq!(translate("foo bar\n\n\n", &catalog).unwrap(), "FOO BAR");
     }
 
     #[test]
@@ -177,7 +208,8 @@ mod tests {
                  \n\
                  last paragraph\n",
                 &catalog
-            ),
+            )
+            .unwrap(),
             "first paragraph\n\
              \n\
              FOO BAR\n\
@@ -203,7 +235,8 @@ mod tests {
                  last\n\
                  paragraph\n",
                 &catalog
-            ),
+            )
+            .unwrap(),
             "FIRST TRANSLATED PARAGRAPH\n\
              \n\
              LAST TRANSLATED PARAGRAPH"
@@ -231,7 +264,7 @@ mod tests {
                  \n\
                  Text after.\n",
                 &catalog
-            ),
+            ).unwrap(),
             "Text before.\n\
              \n\
              ```rust,editable\n\
@@ -248,7 +281,7 @@ mod tests {
     fn test_translate_inline_html() {
         let catalog = create_catalog(&[("foo <b>bar</b> baz", "FOO <b>BAR</b> BAZ")]);
         assert_eq!(
-            translate("foo <b>bar</b> baz", &catalog),
+            translate("foo <b>bar</b> baz", &catalog).unwrap(),
             "FOO <b>BAR</b> BAZ"
         );
     }
@@ -257,7 +290,7 @@ mod tests {
     fn test_translate_block_html() {
         let catalog = create_catalog(&[("foo", "FOO"), ("bar", "BAR")]);
         assert_eq!(
-            translate("<div>\n\nfoo\n\n</div><div>\n\nbar\n\n</div>", &catalog),
+            translate("<div>\n\nfoo\n\n</div><div>\n\nbar\n\n</div>", &catalog).unwrap(),
             "<div>\n\nFOO\n\n</div><div>\n\nBAR\n\n</div>"
         );
     }
@@ -279,7 +312,8 @@ mod tests {
                 | Arrays | `[T; N]`    | `[20, 30, 40]`  |\n\
                 | Tuples | `()`, ...   | `()`, `('x',)`  |",
                 &catalog
-            ),
+            )
+            .unwrap(),
             "\
             ||TYPES|LITERALS|\n\
             |-|-----|--------|\n\
@@ -295,7 +329,7 @@ mod tests {
             ("More details.", "MORE DETAILS."),
         ]);
         assert_eq!(
-            translate("A footnote[^note].\n\n[^note]: More details.", &catalog),
+            translate("A footnote[^note].\n\n[^note]: More details.", &catalog).unwrap(),
             "A FOOTNOTE[^note].\n\n[^note]: MORE DETAILS."
         );
     }
@@ -303,7 +337,7 @@ mod tests {
     #[test]
     fn test_strikethrough() {
         let catalog = create_catalog(&[("~~foo~~", "~~FOO~~")]);
-        assert_eq!(translate("~~foo~~", &catalog), "~~FOO~~");
+        assert_eq!(translate("~~foo~~", &catalog).unwrap(), "~~FOO~~");
     }
 
     #[test]
@@ -316,7 +350,8 @@ mod tests {
                 - [ ] Bar\n\
                 ",
                 &catalog
-            ),
+            )
+            .unwrap(),
             "\
             - [x] FOO\n\
             - [ ] BAR",
@@ -327,7 +362,7 @@ mod tests {
     fn test_heading_attributes() {
         let catalog = create_catalog(&[("Foo", "FOO"), ("Bar", "BAR")]);
         assert_eq!(
-            translate("# Foo { #id .foo }", &catalog),
+            translate("# Foo { #id .foo }", &catalog).unwrap(),
             "# FOO { #id .foo }"
         );
     }
@@ -343,11 +378,20 @@ mod tests {
                 ````\n\
                 ",
                 &catalog
-            ),
+            )
+            .unwrap(),
             "\
             ````d\n\
             ```\n\
             ````",
         );
+    }
+
+    // https://github.com/Byron/pulldown-cmark-to-cmark/issues/91.
+    #[test]
+    fn test_translate_book_invalid() {
+        let catalog = create_catalog(&[("Hello", "Ciao\n---")]);
+        let mut book = create_book(vec![BookItem::PartTitle(String::from("Hello\n---"))]);
+        assert!(translate_book(&catalog, &mut book).is_err());
     }
 }
