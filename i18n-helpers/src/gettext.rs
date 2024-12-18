@@ -43,8 +43,7 @@ fn strip_formatting(text: &str) -> String {
 fn translate(text: &str, catalog: &Catalog) -> anyhow::Result<String> {
     let events = extract_events(text, None);
     // Translation should always succeed.
-    let translated_events =
-        translate_events(&events, catalog).expect("Fatal: failed to translate events");
+    let translated_events = translate_events(&events, catalog).expect("Failed to translate events");
     let (translated, _) = reconstruct_markdown(&translated_events, None)
         .map_err(|e| match e {
             CmarkError::FormatFailed(_) => e.into(),

@@ -462,7 +462,7 @@ fn heuristic_codeblock<'a>(
         _ => true,
     };
 
-    Ok(if is_translate {
+    let (groups, ctx) = if is_translate {
         (
             vec![Group::Translate {
                 events: events.into(),
@@ -472,7 +472,8 @@ fn heuristic_codeblock<'a>(
         )
     } else {
         (vec![Group::Skip(events.into())], ctx)
-    })
+    };
+    Ok((groups, ctx))
 }
 
 /// Creates groups by parsing codeblock.
