@@ -8,5 +8,5 @@ fuzz_target!(|inputs: (Vec<(&str, &str)>, Vec<BookItem>)| {
     let (translations, book_items) = inputs;
     let catalog = create_catalog(translations);
     let mut book = create_book(book_items);
-    translate_book(&catalog, &mut book)
+    let _ = translate_book(&catalog, &mut book); // Err(_) can happen and it's fine.
 });

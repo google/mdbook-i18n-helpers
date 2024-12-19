@@ -80,7 +80,7 @@ impl Preprocessor for Gettext {
         if should_translate(ctx) {
             let mut catalog = load_catalog(ctx)?;
             add_stripped_summary_translations(&mut catalog);
-            translate_book(&catalog, &mut book);
+            translate_book(&catalog, &mut book)?;
         }
         Ok(book)
     }

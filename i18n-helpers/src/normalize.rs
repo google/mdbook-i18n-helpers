@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::Read;
 
 use crate::{extract_messages, new_cmark_parser, wrap_sources};
+use anyhow::Context;
 use chrono::Duration;
 use polib::catalog::Catalog;
 use polib::message::{Message, MessageFlags, MessageMutView, MessageView};
@@ -18,11 +19,12 @@ fn parse_source(source: &str) -> Option<(&str, usize)> {
 }
 
 /// Use only the potion of extract_messages that the normalizer cares about.
-fn extract_document_messages(doc: &str) -> Vec<(usize, String)> {
-    extract_messages(doc)
+fn extract_document_messages(doc: &str) -> anyhow::Result<Vec<(usize, String)>> {
+    Ok(extract_messages(doc)
+        .context("Failed to extract messages")?
         .into_iter()
         .map(|(idx, extracted)| (idx, extracted.message))
-        .collect()
+        .collect())
 }
 
 fn compute_source(source: &str, delta: usize) -> String {
@@ -120,7 +122,7 @@ impl<'a> SourceMap<'a> {
         // link should be defined.
         let document = field.project(message.msgid(), message.msgstr()?);
         if !has_broken_link(document) {
-            return Ok(extract_document_messages(document));
+            return extract_document_messages(document);
         }
 
         // If `parse_source` fails, then `message` has more than one
@@ -128,7 +130,7 @@ impl<'a> SourceMap<'a> {
         // case since it is unclear which link definition to use.
         let path = match parse_source(message.source()) {
             Some((path, _)) => path,
-            None => return Ok(extract_document_messages(document)),
+            None => return extract_document_messages(document),
         };
 
         // First, we try constructing a document using other messages
@@ -159,7 +161,7 @@ impl<'a> SourceMap<'a> {
             let _ = file.read_to_string(&mut full_document);
         }
 
-        let mut messages = extract_document_messages(&full_document);
+        let mut messages = extract_document_messages(&full_document)?;
         // Truncate away the messages from `full_document` which start
         // after `document`.
         let line_count = document.lines().count();
