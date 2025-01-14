@@ -652,11 +652,17 @@ pub fn reconstruct_markdown<'a>(
     // Markdown without the padding to remove the effect of these
     // structural elements. Similarly, we don't want extra newlines at
     // the start.
-    let simplified_state = state.map(|state| State {
-        newlines_before_start: 0,
-        padding: Vec::new(),
-        ..state
-    });
+    let simplified_state = {
+        // Because State is marked as non_exhaustive, we can't do
+        // more intuitive mapping/constructing a new instance. Instead,
+        // doing a clone and in-place mutation.
+        let mut cloned_state = state.clone();
+        if let Some(ref mut state) = cloned_state {
+            state.newlines_before_start = 0;
+            state.padding = Vec::new();
+        }
+        cloned_state
+    };
     cmark_resume_with_options(events, &mut markdown, simplified_state, options).unwrap();
     // Even with `newlines_before_start` set to zero, we get a leading
     // `\n` for code blocks (since they must start on a new line). We
