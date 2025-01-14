@@ -132,9 +132,9 @@ mod tests {
 
     fn create_book(items: Vec<BookItem>) -> Book {
         let mut book = Book::new();
-        items.into_iter().for_each(|item| {
+        for item in items {
             book.push_item(item);
-        });
+        }
         book
     }
 
