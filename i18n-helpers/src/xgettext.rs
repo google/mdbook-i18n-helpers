@@ -36,7 +36,8 @@ fn strip_link(text: &str) -> String {
             _ => Some((0, event)),
         })
         .collect::<Vec<_>>();
-    let (without_link, _) = reconstruct_markdown(&events, None);
+    let (without_link, _) = reconstruct_markdown(&events, None)
+        .unwrap_or_else(|_| panic!("Couldn't strip link \"{}\"", text));
     without_link
 }
 
@@ -139,7 +140,7 @@ where
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
     let summary = summary_reader(ctx.root.join(&summary_path))
         .with_context(|| anyhow!("Failed to read {}", summary_path.display()))?;
-    for (lineno, extracted_msg) in extract_messages(&summary) {
+    for (lineno, extracted_msg) in extract_messages(&summary)? {
         let msgid = extracted_msg.message;
         let source = build_source(&summary_path, lineno, granularity);
         // The summary is mostly links like "[Foo *Bar*](foo-bar.md)".
@@ -216,7 +217,10 @@ where
                 .entry(destination.clone())
                 .or_insert_with(|| Catalog::new(generate_catalog_metadata(ctx)));
 
-            for (lineno, extracted) in extract_messages(&chapter.content) {
+            for (lineno, extracted) in extract_messages(&chapter.content).context(anyhow!(
+                "Failed to extract messages in chapter {}",
+                chapter.name
+            ))? {
                 let msgid = extracted.message;
                 let source = build_source(&path, lineno, granularity);
                 add_message(catalog, &msgid, &source, &extracted.comment);
@@ -236,7 +240,10 @@ where
                     .or_insert_with(|| Catalog::new(generate_catalog_metadata(ctx)));
 
                 let path = ctx.config.book.src.join(&source);
-                for (lineno, extracted) in extract_messages(&content) {
+                for (lineno, extracted) in extract_messages(&content).context(anyhow!(
+                    "Failed to extract messages in chapter {}",
+                    chapter.name
+                ))? {
                     let msgid = extracted.message;
                     let source = build_source(&path, lineno, granularity);
                     add_message(catalog, &msgid, &source, &extracted.comment);
