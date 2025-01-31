@@ -1,7 +1,7 @@
-const POT_EXTENSION: &str = "pot";
-
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+const POT_EXTENSION: &str = "pot";
 
 /// Mimics the `push` and `pop` functionalities of [`PathBuf`] with,
 /// respectively, the [`push`] and [`pop`] methods, so that:
@@ -48,10 +48,10 @@ impl UniquePathBuilder {
 
     fn format_path_with_counter(&self) -> PathBuf {
         match self.frequency_map.get(&self.current_path) {
-            None | Some(&0) => self.current_path.clone(),
+            None | Some(1) => self.current_path.clone(),
             Some(&cnt) => {
                 let mut file_name = self.current_path.file_name().unwrap().to_os_string();
-                file_name.push(format!("-{}", cnt));
+                file_name.push(format!("-{}", cnt - 1));
                 self.current_path.with_file_name(file_name)
             }
         }
@@ -78,7 +78,7 @@ impl UniquePathBuilder {
         self.frequency_map
             .entry(self.current_path.clone())
             .and_modify(|cnt| *cnt += 1)
-            .or_insert(0);
+            .or_insert(1);
     }
 
     pub fn pop(&mut self) {
