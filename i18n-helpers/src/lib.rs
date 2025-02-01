@@ -37,6 +37,7 @@ pub mod directives;
 pub mod gettext;
 pub mod normalize;
 pub mod preprocessors;
+pub mod renderers;
 pub mod xgettext;
 
 /// Re-wrap the sources field of a message.
