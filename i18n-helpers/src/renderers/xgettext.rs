@@ -19,12 +19,13 @@ impl Renderer for Xgettext {
 
         // Create a template file for each entry with the content from the respective catalog.
         for (file_path, catalog) in catalogs {
-            let directory_path = file_path.parent().unwrap();
+            let dst_path = ctx.destination.join(file_path);
+            let directory_path = dst_path.parent().unwrap();
             fs::create_dir_all(directory_path)
                 .with_context(|| format!("Could not create {}", directory_path.display()))?;
 
-            polib::po_file::write(&catalog, &file_path)
-                .with_context(|| format!("Writing messages to {}", file_path.display()))?;
+            polib::po_file::write(&catalog, &dst_path)
+                .with_context(|| format!("Writing messages to {}", dst_path.display()))?;
         }
 
         Ok(())
