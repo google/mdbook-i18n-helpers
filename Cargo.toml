@@ -10,8 +10,8 @@ print_stderr = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.95"
-mdbook = { version = "0.4.43", default-features = false }
+mdbook = { version = "0.4.44", default-features = false }
 polib = "0.2.0"
 pretty_assertions = "1.4.1"
-serde_json = "1.0.134"
+serde_json = "1.0.138"
 tempfile = "3.16.0"
