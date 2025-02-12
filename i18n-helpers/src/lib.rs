@@ -71,7 +71,7 @@ pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
 /// particular:
 ///
 /// - If a code block has started, the text should be parsed
-/// without interpreting special Markdown characters.
+///   without interpreting special Markdown characters.
 /// - In a table cell, the text should be parsed as inlines.
 ///
 /// The events are labeled with the line number where they start in
