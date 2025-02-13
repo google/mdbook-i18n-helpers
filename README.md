@@ -57,7 +57,7 @@ each release.
 Run
 
 ```shell
-$ cargo install mdbook-tera-backend
+cargo install mdbook-tera-backend
 ```
 
 ### `i18n-report`
@@ -65,7 +65,7 @@ $ cargo install mdbook-tera-backend
 Run
 
 ```shell
-$ cargo install i18n-report
+cargo install i18n-report
 ```
 
 ## Contact
