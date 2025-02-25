@@ -2,6 +2,11 @@
 
 This lists the most important changes between releases of mdbook-i18n-helpers.
 
+## Version 0.3.6 (2025-02-25)
+
+- Dependency updates, notably mdbook to 0.4.44 which adds support for Rust 2024
+  edition.
+
 ## Version 0.3.5 (2024-07-23)
 
 - [#208]: Trim dependencies by @klensy
