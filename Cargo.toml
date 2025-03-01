@@ -9,9 +9,9 @@ print_stdout = "warn"
 print_stderr = "warn"
 
 [workspace.dependencies]
-anyhow = "1.0.95"
-mdbook = { version = "0.4.44", default-features = false }
+anyhow = "1.0.96"
+mdbook = { version = "0.4.45", default-features = false }
 polib = "0.2.0"
 pretty_assertions = "1.4.1"
-serde_json = "1.0.138"
+serde_json = "1.0.139"
 tempfile = "3.16.0"
