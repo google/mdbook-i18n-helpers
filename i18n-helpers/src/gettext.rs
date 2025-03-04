@@ -322,6 +322,34 @@ mod tests {
     }
 
     #[test]
+    fn test_translate_html_in_table() {
+        let catalog = create_catalog(&[
+            ("Icon", "ICON"),
+            ("Description", "DESCRIPTION"),
+            (
+                "<img src=\"some-icon.svg\" alt=\"Some icon.\"/>",
+                "<img src=\"some-icon.svg\" alt=\"SOME ICON.\"/>",
+            ),
+            ("Some description.", "SOME DESCRIPTION."),
+        ]);
+        // The alignment is lost when we generate new Markdown.
+        assert_eq!(
+            translate(
+                "\
+                | Icon                                            | Description       |\n\
+                |-------------------------------------------------|-------------------|\n\
+                | <img src=\"some-icon.svg\" alt=\"Some icon.\"/> | Some description. |",
+                &catalog
+            )
+            .unwrap(),
+            "\
+            |ICON|DESCRIPTION|\n\
+            |----|-----------|\n\
+            |<img src=\"some-icon.svg\" alt=\"SOME ICON.\"/>|SOME DESCRIPTION.|"
+        );
+    }
+
+    #[test]
     fn test_footnote() {
         let catalog = create_catalog(&[
             ("A footnote[^note].", "A FOOTNOTE[^note]."),
