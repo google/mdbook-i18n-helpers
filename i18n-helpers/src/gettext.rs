@@ -347,6 +347,24 @@ mod tests {
     }
 
     #[test]
+    fn test_translate_escaped_pipe_in_table() {
+        let catalog = create_catalog(&[("foo\\|bar", "FOO\\|BAR")]);
+        // The alignment is lost when we generate new Markdown.
+        assert_eq!(
+            translate(
+                "\
+                |foo\\|bar|\n\
+                |---------|",
+                &catalog
+            )
+            .unwrap(),
+            "\
+            |FOO\\|BAR|\n\
+            |-------|",
+        );
+    }
+
+    #[test]
     fn test_footnote() {
         let catalog = create_catalog(&[
             ("A footnote[^note].", "A FOOTNOTE[^note]."),
