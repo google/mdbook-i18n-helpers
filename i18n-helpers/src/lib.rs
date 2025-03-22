@@ -124,6 +124,21 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
         }
     }
 
+    // Perform some common transformations on the events
+    fn convert_event_common<'a>(event: Event<'a>) -> Event<'a> {
+        match event {
+            Event::SoftBreak => Event::Text(" ".into()),
+            // Shortcut links like "[foo]" end up as "[foo]"
+            // in output. By changing them to a reference
+            // link, the link is expanded on the fly and the
+            // output becomes self-contained.
+            Event::Start(tag @ (Tag::Link { .. } | Tag::Image { .. })) => {
+                Event::Start(expand_shortcut_link(tag))
+            }
+            _ => event,
+        }
+    }
+
     // Offsets of each newline in the input, used to calculate line
     // numbers from byte offsets.
     let offsets = text
@@ -147,23 +162,13 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
             let text = format!("|{text}|\n|-|");
             new_cmark_parser::<'_, DefaultBrokenLinkCallback>(&text, None)
                 .filter_map(|event| {
-                    let event = match event {
-                        Event::Start(Tag::Table(..) | Tag::TableHead | Tag::TableCell)
-                        | Event::End(TagEnd::Table | TagEnd::TableHead | TagEnd::TableCell) => {
-                            return None
-                        }
-                        Event::SoftBreak => Event::Text(" ".into()),
-                        // Shortcut links like "[foo]" end up as "[foo]"
-                        // in output. By changing them to a reference
-                        // link, the link is expanded on the fly and the
-                        // output becomes self-contained.
-                        Event::Start(tag @ (Tag::Link { .. } | Tag::Image { .. })) => {
-                            Event::Start(expand_shortcut_link(tag))
-                        }
-                        _ => event,
-                    };
+                    if let Event::Start(Tag::Table(..) | Tag::TableHead | Tag::TableCell)
+                    | Event::End(TagEnd::Table | TagEnd::TableHead | TagEnd::TableCell) = event
+                    {
+                        return None;
+                    }
                     // The line number is always 1 because tables don't allow newlines
-                    Some((1, event.into_static()))
+                    Some((1, convert_event_common(event).into_static()))
                 })
                 .collect()
         }
@@ -172,18 +177,7 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
             .into_offset_iter()
             .map(|(event, range)| {
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
-                let event = match event {
-                    Event::SoftBreak => Event::Text(" ".into()),
-                    // Shortcut links like "[foo]" end up as "[foo]"
-                    // in output. By changing them to a reference
-                    // link, the link is expanded on the fly and the
-                    // output becomes self-contained.
-                    Event::Start(tag @ (Tag::Link { .. } | Tag::Image { .. })) => {
-                        Event::Start(expand_shortcut_link(tag))
-                    }
-                    _ => event,
-                };
-                (lineno, event)
+                (lineno, convert_event_common(event))
             })
             .collect(),
     }
