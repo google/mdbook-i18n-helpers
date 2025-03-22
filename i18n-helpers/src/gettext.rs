@@ -326,26 +326,23 @@ mod tests {
         let catalog = create_catalog(&[
             ("Icon", "ICON"),
             ("Description", "DESCRIPTION"),
-            (
-                "<img src=\"some-icon.svg\" alt=\"Some icon.\"/>",
-                "<img src=\"some-icon.svg\" alt=\"SOME ICON.\"/>",
-            ),
+            ("<img src=\"some-icon.svg\"", "<img src=\"some-icon.svg\""),
             ("Some description.", "SOME DESCRIPTION."),
         ]);
         // The alignment is lost when we generate new Markdown.
         assert_eq!(
             translate(
                 "\
-                | Icon                                            | Description       |\n\
-                |-------------------------------------------------|-------------------|\n\
-                | <img src=\"some-icon.svg\" alt=\"Some icon.\"/> | Some description. |",
+                | Icon                         | Description       |\n\
+                |------------------------------|-------------------|\n\
+                | <img src=\"some-icon.svg\"/> | Some description. |",
                 &catalog
             )
             .unwrap(),
             "\
             |ICON|DESCRIPTION|\n\
             |----|-----------|\n\
-            |<img src=\"some-icon.svg\" alt=\"SOME ICON.\"/>|SOME DESCRIPTION.|"
+            |<img src=\"some-icon.svg\"/>|SOME DESCRIPTION.|"
         );
     }
 
