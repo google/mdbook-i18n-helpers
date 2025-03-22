@@ -144,7 +144,7 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
         // table, and return the contents of the cell. This matches the behavior of
         // the parser in this case.
         Some(state) if state.in_table_cell => {
-            let text = format!("|{}|\n|-|", text);
+            let text = format!("|{text}|\n|-|");
             new_cmark_parser::<'_, DefaultBrokenLinkCallback>(&text, None)
                 .filter_map(|event| {
                     let event = match event {
