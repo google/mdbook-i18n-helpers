@@ -5,7 +5,7 @@ use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
 use::std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use anyhow::Context;
 use anyhow::Error;
 use chrono;
@@ -30,8 +30,7 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
   if locale == "en" {
     println!("::group::Building English course");
   } else {
-    println!("::group::Building {} course", locale);
-    let file = fs::File::open(format!("po/{locale}.po")).expect("Error reading .po file for your locale");
+    let file = fs::File::open(format!("po/{locale}.po"))?;
     let reader = io::BufReader::new(file);
 
     let mut pot_creation_date: Option<String> = None;
@@ -53,39 +52,20 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
       println!("Created date from now {:?}", pot_creation_date);
     }
 
-    println!("Building {locale} translation as of {:?}", pot_creation_date.unwrap());
+    println!("::group::Building {locale} translation as of {:?}", pot_creation_date.unwrap());
+
+    // Back-date the source to POT-Creation-Date. The content lives in two directories:
+    // fs::remove_file(pdf_from_path)?;
   }
 
   // Enable mdbook-pandoc to build PDF version of the course
   env::set_var("MDBOOK_OUTPUT__PANDOC__DISABLED", "false");
 
-  let dir = env::current_dir()?;
   let dest_arg = format!("-d{dest_dir}");
-  let output = Command::new("mdbook").arg("build").arg(dest_arg).stdout(Stdio::piped()).current_dir(dir).output();
+  Command::new("mdbook").arg("build").arg(dest_arg).output()?;
 
-  match output {
-    Ok(output) => {
-      println!("Exit status: {}", output.status);
-      let stdout_str = String::from_utf8_lossy(&output.stdout);
-      println!("\nStdout:");
-      if stdout_str.is_empty() {
-          println!("(empty)");
-      } else {
-          println!("{}", stdout_str);
-      }
-
-      // Capture stderr as well (often useful for debugging failures)
-      let stderr_str = String::from_utf8_lossy(&output.stderr);
-      if !stderr_str.is_empty() {
-          eprintln!("\nStderr:"); // Use eprintln for errors
-          eprintln!("{}", stderr_str);
-      }
-    },
-    Err(err) =>  panic!("Failed to execute mdbook build: {err}"),
-  }
   // Disable the redbox button in built versions of the course
-  let _ = fs::write(format!("{}/html/theme/redbox.js", dest_dir), "// Disabled in published builds, see build.sh")
-    .expect("Unable to write to /html/theme/redbox.js");
+  fs::write(format!("{}/html/theme/redbox.js", dest_dir), "// Disabled in published builds, see build.sh")?;
 
   let pdf_from_dir = format!("{}/pandoc/pdf/comprehensive-rust.pdf", dest_dir);
   let pdf_dest_dir = format!("{}/html/comprehensive-rust.pdf", dest_dir);
