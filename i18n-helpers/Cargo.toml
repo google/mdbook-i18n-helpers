@@ -25,6 +25,8 @@ semver = "1.0.26"
 serde_json.workspace = true
 syntect = { version = "5.2.0", default-features = false, features = ["parsing", "default-syntaxes", "regex-onig"] }
 textwrap = { version = "0.16.2", default-features = false }
+walkdir = "2.5.0"
+zip = "2.6.1"
 
 [dev-dependencies]
 pretty_assertions.workspace = true
