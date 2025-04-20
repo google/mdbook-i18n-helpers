@@ -477,93 +477,39 @@ fn heuristic_codeblock<'a>(
     Ok((groups, ctx))
 }
 
-// /// Parses the title string from an admonish line component, handling
-// /// both single ('') and double ("") quotes.
-// ///
-// /// It looks for the pattern `title='...'` or `title="..."` within the input
-// /// string slice and returns the content inside the quotes.
-// ///
-// /// Currently, this looks for exact matches... Could make this more robust with
-// /// regular expressions or more advanced parsing to also allow:
-// /// - title = '...'
-// /// - title= '...'
-// /// - title ='...'
-// /// and so on with either quote style
-// ///
-// /// # Arguments
-// ///
-// /// * `line_part` - A string slice representing the part of the admonish line
-// ///                 *after* the initial "```admonish type" part.
-// ///                 For example: " title=\"Fun fact\"" or " title='Another fact'"
-// ///
-// /// # Returns
-// ///
-// /// * `Some(&str)` containing the title if found and correctly quoted.
-// /// * `None` if the `title=` pattern is not found, if it's not immediately
-// ///   followed by a single or double quote, or if the closing quote is missing.
-// fn parse_admonish_title_flexible(line_part: &str) -> Option<&str> {
-//     // 1. Find the start of the title attribute "title="
-//     //    We only care about the part *after* the marker.
-//     let (_, after_marker) = line_part.split_once("title=")?;
+/// Special Admonish "codeblock" - extract the body content for translation
+/// If a title is present, also extract that for translation
+/// Note this is from mdbook-admonish: https://github.com/tommilligan/mdbook-admonish
+fn admonish_codeblock<'a>(
+    events: &'a [(usize, Event<'_>)],
+    mut ctx: GroupingContext,
+) -> Result<(Vec<Group<'a>>, GroupingContext), CmarkError> {
+    // First, ensure we're dealing with a code block
+    if events.len() < 2
+        || !matches!(&events[0].1, Event::Start(Tag::CodeBlock(_)))
+        || !matches!(&events[events.len() - 1].1, Event::End(TagEnd::CodeBlock))
+    {
+        return heuristic_codeblock(events, ctx);
+    }
 
-//     // 2. Check the very next character after "title=". It must be a quote.
-//     //    `chars().next()` gets the first character as an Option<char>.
-//     //    The `?` operator handles the case where `after_marker` is empty.
-//     let opening_quote = after_marker.chars().next()?;
+    // Check if we're dealing with a fenced code block
+    if !matches!(
+        &events[0].1,
+        Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(_)))
+    ) {
+        return heuristic_codeblock(events, ctx);
+    };
 
-//     // 3. Verify if the character is indeed a single or double quote.
-//     if opening_quote != '"' && opening_quote != '\'' {
-//         // If it's not a recognized quote character, the format is wrong.
-//         return None;
-//     }
+    // Handle the entire block as a single translatable unit
+    // The translate_events function will take care of matching the proper translations
+    // for both the title and body content based on the PO file entries
+    let groups = vec![Group::Translate {
+        events: events.into(),
+        comment: std::mem::take(&mut ctx.comments).join(" "),
+    }];
 
-//     // 4. Get the substring *after* the opening quote.
-//     //    `opening_quote.len_utf8()` gives the byte length of the character (1 for ' or ").
-//     let content_part = &after_marker[opening_quote.len_utf8()..];
-
-//     // 5. Find the *next* occurrence of the *same* quote character (`opening_quote`)
-//     //    in the remaining part of the string (`content_part`).
-//     //    `split_once` takes a `char` pattern directly.
-//     let (title, _) = content_part.split_once(opening_quote)?;
-
-//     // 6. If both splits succeeded, 'title' now holds the desired string slice.
-//     Some(title)
-// }
-
-// /// Special Admonish "codeblock" - treat "block" as paragraph text
-// /// In addition, try to parse out the title
-// fn admonish_codeblock<'a>(
-//     events: &'a [(usize, Event<'_>)],
-//     mut ctx: GroupingContext,
-// ) -> Result<(Vec<Group<'a>>, GroupingContext), CmarkError> {
-//     // Parse out the title, if one, and add it to translatable events
-//     // Pull out the entire body and treat it as a translatable "paragraph"
-//     for (idx, event) in events.iter().enumerate() {
-//         let mut translate_events = vec![];
-//         let mut groups = vec![];
-
-//         match event {
-//             (text_line, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(x)))) => {
-//                 let title = parse_admonish_title_flexible(x)
-//             }
-//             (text_line, Event::Text(text)) => {
-//                 let is_translate =
-//                 let (groups, ctx) = {
-//                     (
-//                         vec![Group::Translate {
-//                             events: events.into(),
-//                             comment: std::mem::take(&mut ctx.comments).join(" "),
-//                         }],
-//                         ctx,
-//                     )
-//                 } else {
-//                     (vec![Group::Skip(events.into())], ctx)
-//                 };
-//             }
-//         }
-//     }
-//     Ok((groups, ctx))
-// }
+    Ok((groups, ctx))
+}
 
 /// Creates groups by parsing codeblock.
 fn parse_codeblock<'a>(
@@ -581,23 +527,25 @@ fn parse_codeblock<'a>(
     };
 
     let Some(syntax) = syntax else {
-        // // This is to handle the special case mdbook-admonish custom
-        // // "code block"
-        // // https://github.com/tommilligan/mdbook-admonish
-        // static ADMONISH_CODEBLOCK_NAME: &str = "admonish";
-        // let is_admonish = if let (_, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(x)))) = &events[0] {
-        //     x.split(',').next().unwrap().contains(ADMONISH_CODEBLOCK_NAME)
-        // } else {
-        //     false
-        // };
-        // if is_admonish {
-        //     eprintln!("Admonish codeblock");
-        //     return admonish_codeblock(events, ctx);
-        // } else {
+        // This is to handle the special case mdbook-admonish custom
+        // "code block"
+        // https://github.com/tommilligan/mdbook-admonish
+        static ADMONISH_CODEBLOCK_NAME: &str = "admonish";
+        let is_admonish =
+            if let (_, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(x)))) = &events[0] {
+                x.split(',')
+                    .next()
+                    .unwrap()
+                    .contains(ADMONISH_CODEBLOCK_NAME)
+            } else {
+                false
+            };
+        if is_admonish {
+            return admonish_codeblock(events, ctx);
+        } else {
             // If there is no language specifier, falling back to heuristic way.
-            // eprintln!("heuristic codeblock");
             return heuristic_codeblock(events, ctx);
-        // }
+        }
     };
 
     let mut ps = ParseState::new(syntax);
@@ -1087,11 +1035,17 @@ mod tests {
         );
         // eprintln!("{:#?}", actual_events);
         let expected_events = vec![
-            (1, Start(CodeBlock(CodeBlockKind::Fenced("c++".into())),),),
-            (2, Text("// Fun fact\n// The star waves trembled slightly,\n\
+            (1, Start(CodeBlock(CodeBlockKind::Fenced("c++".into())))),
+            (
+                2,
+                Text(
+                    "// Fun fact\n// The star waves trembled slightly,\n\
                       // neutrons and nuclei whispered,\n\
-                      // and the mystery became clearer.\n".into())),
-            (1, End(TagEnd::CodeBlock))
+                      // and the mystery became clearer.\n"
+                        .into(),
+                ),
+            ),
+            (1, End(TagEnd::CodeBlock)),
         ];
         assert_eq!(expected_events, actual_events);
     }
@@ -1116,12 +1070,21 @@ mod tests {
             (1, Start(Paragraph)),
             (1, Text("Text before.".into())),
             (1, End(TagEnd::Paragraph)),
-            (4, Start(CodeBlock(CodeBlockKind::Fenced("rust,editable".into())))),
-            (5, Text("// line comment\n\
+            (
+                4,
+                Start(CodeBlock(CodeBlockKind::Fenced("rust,editable".into()))),
+            ),
+            (
+                5,
+                Text(
+                    "// line comment\n\
                       fn foo() {\n\
                       \n    let x /* inline comment */ = \"hello\"; // line comment\n\n\
                       }\n\
-                      /* block\ncomment */\n".into())),
+                      /* block\ncomment */\n"
+                        .into(),
+                ),
+            ),
             (4, End(TagEnd::CodeBlock)),
             (15, Start(Paragraph)),
             (15, Text("Text after.".into())),
@@ -1142,11 +1105,22 @@ mod tests {
             None,
         );
         let expected_events = vec![
-            (1, Start(CodeBlock(CodeBlockKind::Fenced("admonish tip title=\"Fun fact\"".into())),),),
-            (2, Text("The star waves trembled slightly, \n\
+            (
+                1,
+                Start(CodeBlock(CodeBlockKind::Fenced(
+                    "admonish tip title=\"Fun fact\"".into(),
+                ))),
+            ),
+            (
+                2,
+                Text(
+                    "The star waves trembled slightly, \n\
                       neutrons and nuclei whispered, \n\
-                      and the mystery became clearer. \n".into())),
-            (1, End(TagEnd::CodeBlock))
+                      and the mystery became clearer. \n"
+                        .into(),
+                ),
+            ),
+            (1, End(TagEnd::CodeBlock)),
         ];
         assert_eq!(expected_events, actual_events);
     }
