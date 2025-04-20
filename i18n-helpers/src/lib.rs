@@ -868,7 +868,6 @@ pub fn translate_events<'a>(
             Group::Translate { events, .. } => {
                 // Reconstruct the message.
                 let (msgid, new_state) = reconstruct_markdown(&events, state.clone())?;
-                // eprintln!("msgid = {msgid}");
                 let translated = catalog
                     .find_message(None, &msgid, None)
                     .filter(|msg| !msg.flags().is_fuzzy() && msg.is_translated())
