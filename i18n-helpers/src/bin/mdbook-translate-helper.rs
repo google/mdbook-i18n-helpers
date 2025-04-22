@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::io;
+use std::io::stdout;
 use std::io::BufRead;
 use std::io::Read;
 use std::io::Write;
@@ -30,7 +31,8 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
   if locale == "en" {
     println!("::group::Building English course");
   } else {
-    let file = fs::File::open(format!("po/{locale}.po"))?;
+    let locale_ref = &locale;
+    let file = fs::File::open(format!("po/{locale_ref}.po"))?;
     let reader = io::BufReader::new(file);
 
     let mut pot_creation_date: Option<String> = None;
@@ -49,20 +51,83 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
     if pot_creation_date.is_none() {
       let now = chrono::Local::now();
       pot_creation_date = Some(now.format("%Y-%m-%dT%H:%M:%S").to_string());
-      println!("Created date from now {:?}", pot_creation_date);
+      // println!("Created date from now {:?}", pot_creation_date);
     }
 
-    println!("::group::Building {locale} translation as of {:?}", pot_creation_date.unwrap());
+    println!("::group::Building {locale_ref} translation as of {:?}", pot_creation_date.clone().unwrap());
 
     // Back-date the source to POT-Creation-Date. The content lives in two directories:
-    // fs::remove_file(pdf_from_path)?;
+    fs::remove_dir_all("src");
+    fs::remove_dir_all("third_party");
+    // Command::new("git").arg("rev-list").arg("-n").arg("--")
+    let output = Command::new("git").args(["rev-list", "-n", "1", "--before", &pot_creation_date.unwrap(), "@"]).output();
+    let result_str: String;
+    match output {
+        Ok(result) => {
+          result_str = String::from_utf8(result.stdout).unwrap().replace("\n", "");
+          println!("result string: {:?}", result_str.clone());
+        },
+        Err(err) => {
+          return Err(err.into());
+        }
+    }
+    // io::stdout().write_all(&output.stdout).unwrap();
+    let output2 = Command::new("git").args(["restore","--source", &result_str, "src/", "third_party/"]).output();
+
+    env::set_var("MDBOOK_BOOK__LANGUAGE", locale_ref);
+    env::set_var("MDBOOK_OUTPUT__HTML__SITE_URL", format!("/comprehensive-rust/{locale_ref}/"));
+    env::set_var("MDBOOK_OUTPUT__HTML__REDIRECT", "{}");
+
+    match output2 {
+      Ok(result) => {
+        println!("result string: {}", result.status);
+        println!("result string: {:#?}", result.stdout);
+        println!("result stderr string: {:#?}", String::from_utf8(result.stderr).unwrap());
+      },
+      Err(err) => {
+        println!("inside err case");
+        return Err(err.into());
+      }
+    }
   }
 
   // Enable mdbook-pandoc to build PDF version of the course
   env::set_var("MDBOOK_OUTPUT__PANDOC__DISABLED", "false");
 
   let dest_arg = format!("-d{dest_dir}");
-  Command::new("mdbook").arg("build").arg(dest_arg).output()?;
+  let output3 = Command::new("mdbook").arg("build").arg(dest_arg).output();
+  match output3 {
+    Ok(output) => {
+      // println!("result string: {}", result.status);
+      // println!("result string: {:?}", result.stdout);
+      // println!("result stderr string: {:?}", String::from_utf8(result.stderr).unwrap());
+
+      // println!("Exit status: {}", output.status);
+      let stdout_str = String::from_utf8_lossy(&output.stdout);
+      println!("\nStdout:");
+      if stdout_str.is_empty() {
+          println!("(empty)");
+      } else {
+          println!("{}", stdout_str);
+      }
+
+      // Capture stderr as well (often useful for debugging failures)
+      let stderr_str = String::from_utf8_lossy(&output.stderr);
+      if !stderr_str.is_empty() {
+          eprintln!("\nStderr:"); // Use eprintln for errors
+          eprintln!("{}", stderr_str);
+      }
+
+      if !output.status.success() {
+          eprintln!("Command has non-zero exist status: {}", output.status);
+          // return Err();
+      }
+    },
+    Err(err) => {
+      println!("inside err case");
+      return Err(err.into());
+    }
+  }
 
   // Disable the redbox button in built versions of the course
   fs::write(format!("{}/html/theme/redbox.js", dest_dir), "// Disabled in published builds, see build.sh")?;
