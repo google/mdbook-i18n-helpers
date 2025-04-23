@@ -314,4 +314,3 @@ You will only need to run `mdbook-i18n-normalize` once after upgrading
 mdbook-i18n-helpers.
 
 [1]: https://github.com/tommilligan/mdbook-admonish
-
