@@ -160,13 +160,6 @@ ensure that `mdbook-gettext` runs prior to `mdbook-admonish` by modifying your
 `book.toml` file like so:
 
 ```toml
-[preprocessor.admonish]
-command = "mdbook-admonish"
-on_failure = "bail"
-assets_version = "3.0.2" # do not edit: managed by `mdbook-admonish install`
-
-#...
-
 [preprocessor.gettext]
 before = ["admonish"]
 after = ["links"]
@@ -321,3 +314,4 @@ You will only need to run `mdbook-i18n-normalize` once after upgrading
 mdbook-i18n-helpers.
 
 [1]: https://github.com/tommilligan/mdbook-admonish
+
