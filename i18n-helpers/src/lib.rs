@@ -1870,27 +1870,41 @@ print("Hello world")
 
     #[test]
     fn test_is_admonish_not_admonish_code_block() {
-        let events = vec![(1, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("rust".into()))))];
+        let events = vec![(
+            1,
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("rust".into()))),
+        )];
         assert!(!is_admonish(&events));
     }
 
     #[test]
     fn test_is_admonish_with_admonish_code_block_no_end() {
-        let events = vec![(1, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish".into()))))];
+        let events = vec![(
+            1,
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish".into()))),
+        )];
         assert!(!is_admonish(&events));
     }
 
     #[test]
     fn test_is_admonish_with_admonish_and_params_no_end() {
-        let events = vec![(1, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish tip title=\"Fun fact\"".into()))))];
+        let events = vec![(
+            1,
+            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
+                "admonish tip title=\"Fun fact\"".into(),
+            ))),
+        )];
         assert!(!is_admonish(&events));
     }
 
     #[test]
     fn test_is_admonish_with_admonish_code_block() {
         let events = vec![
-            (1, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish".into())))),
-            (2, Event::End(TagEnd::CodeBlock))
+            (
+                1,
+                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish".into()))),
+            ),
+            (2, Event::End(TagEnd::CodeBlock)),
         ];
         assert!(is_admonish(&events));
     }
@@ -1898,8 +1912,13 @@ print("Hello world")
     #[test]
     fn test_is_admonish_with_admonish_and_params() {
         let events = vec![
-            (1, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish tip title=\"Fun fact\"".into())))),
-            (2, Event::End(TagEnd::CodeBlock))
+            (
+                1,
+                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
+                    "admonish tip title=\"Fun fact\"".into(),
+                ))),
+            ),
+            (2, Event::End(TagEnd::CodeBlock)),
         ];
         assert!(is_admonish(&events));
     }
@@ -1917,7 +1936,7 @@ print("Hello world")
         // Regular text should be extracted normally, not as admonish
         assert_extract_messages(
             "This is not a code block",
-            &[(1, "This is not a code block")]
+            &[(1, "This is not a code block")],
         );
     }
 
@@ -1926,7 +1945,7 @@ print("Hello world")
         // Regular code blocks should be processed differently from admonish blocks
         assert_extract_messages(
             "```rust\nfn main() {\n    println!(\"Hello\");\n}\n```",
-            &[(3, "\"Hello\"")]
+            &[(3, "\"Hello\"")],
         );
     }
 
@@ -1935,7 +1954,7 @@ print("Hello world")
         // Ensure admonish blocks are properly processed
         assert_extract_messages(
             "```admonish\nThis is an admonish block\n```",
-            &[(1, "```admonish\nThis is an admonish block\n```")]
+            &[(1, "```admonish\nThis is an admonish block\n```")],
         );
     }
 
@@ -1944,19 +1963,26 @@ print("Hello world")
         // Ensure admonish blocks with titles are properly processed
         assert_extract_messages(
             "```admonish tip title=\"Note\"\nThis is an admonish block with title\n```",
-            &[(1, "```admonish tip title=\"Note\"\nThis is an admonish block with title\n```")]
+            &[(
+                1,
+                "```admonish tip title=\"Note\"\nThis is an admonish block with title\n```",
+            )],
         );
     }
 
     #[test]
     fn test_admonish_codeblock_incomplete() {
         // Ensure incomplete admonish blocks are handled correctly
-        let result = extract_messages("```admonish\nIncomplete block without closing backticks").unwrap();
+        let result =
+            extract_messages("```admonish\nIncomplete block without closing backticks").unwrap();
 
         // Check that we get a message containing the incomplete block
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0, 1);  // Line number
+        assert_eq!(result[0].0, 1); // Line number
         assert!(result[0].1.message.contains("```admonish"));
-        assert!(result[0].1.message.contains("Incomplete block without closing backticks"));
+        assert!(result[0]
+            .1
+            .message
+            .contains("Incomplete block without closing backticks"));
     }
 }
