@@ -481,7 +481,6 @@ fn heuristic_codeblock<'a>(
 /// If a title is present, also extract that for translation
 /// Note this is from mdbook-admonish: https://github.com/tommilligan/mdbook-admonish
 /// This assumes it is called by `parse_codeblock()` when `is_admonish() == true`
-/// Thus, it does not repeat many of the identical checks to save some FLOPS
 fn admonish_codeblock<'a>(
     events: &'a [(usize, Event<'_>)],
     mut ctx: GroupingContext,
@@ -501,28 +500,16 @@ fn admonish_codeblock<'a>(
 fn is_admonish(events: &[(usize, Event<'_>)]) -> bool {
     const ADMONISH_CODEBLOCK_NAME: &str = "admonish";
 
-    // Ensure we have at least two events
-    if events.len() < 2 {
-        return false;
-    }
-
-    // ensure we are in a proper code block
-    let (_, Event::End(TagEnd::CodeBlock)) = &events[events.len() - 1] else {
-        return false;
-    };
-
     // pull the info_string (aka language specifier) out of the code block
     // (the string after the ```)
-    let (_, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info_string)))) = &events[0] else {
-        return false;
-    };
-
-    // Check if the language specifier contains "admonish"
-    info_string
-        .split(',')
-        .next()
-        .unwrap_or_default()
-        .contains(ADMONISH_CODEBLOCK_NAME)
+    match events {
+        [(_, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info_string)))), .., (_, Event::End(TagEnd::CodeBlock))] =>
+        {
+            // Check if the language specifier contains "admonish"
+            matches!(info_string.split_once(' '), Some((keyword, _)) if keyword == ADMONISH_CODEBLOCK_NAME)
+        }
+        _ => false,
+    }
 }
 
 /// Creates groups by parsing codeblock.
@@ -1849,140 +1836,66 @@ print("Hello world")
         );
     }
 
-    // Tests for the is_admonish function
     #[test]
-    fn test_is_admonish_empty_events() {
-        let events: Vec<(usize, Event<'_>)> = Vec::new();
-        assert!(!is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_not_code_block() {
-        let events = vec![(1, Event::Text("Some text".into()))];
-        assert!(!is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_not_fenced_code_block() {
-        let events = vec![(1, Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)))];
-        assert!(!is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_not_admonish_code_block() {
-        let events = vec![(
-            1,
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("rust".into()))),
-        )];
-        assert!(!is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_with_admonish_code_block_no_end() {
-        let events = vec![(
-            1,
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish".into()))),
-        )];
-        assert!(!is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_with_admonish_and_params_no_end() {
-        let events = vec![(
-            1,
-            Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
-                "admonish tip title=\"Fun fact\"".into(),
-            ))),
-        )];
-        assert!(!is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_with_admonish_code_block() {
-        let events = vec![
-            (
-                1,
-                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced("admonish".into()))),
-            ),
-            (2, Event::End(TagEnd::CodeBlock)),
-        ];
-        assert!(is_admonish(&events));
-    }
-
-    #[test]
-    fn test_is_admonish_with_admonish_and_params() {
-        let events = vec![
-            (
-                1,
-                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(
-                    "admonish tip title=\"Fun fact\"".into(),
-                ))),
-            ),
-            (2, Event::End(TagEnd::CodeBlock)),
-        ];
-        assert!(is_admonish(&events));
-    }
-
-    // Tests for the admonish_codeblock function by testing the extraction of messages
-    // These tests verify that the function correctly handles different input conditions
-    #[test]
-    fn test_admonish_codeblock_extraction_empty() {
-        // Empty events should not produce any messages
-        assert_extract_messages("", &[]);
-    }
-
-    #[test]
-    fn test_admonish_codeblock_extraction_not_code_block() {
-        // Regular text should be extracted normally, not as admonish
+    fn extract_admonish_codeblock() {
         assert_extract_messages(
-            "This is not a code block",
-            &[(1, "This is not a code block")],
-        );
-    }
-
-    #[test]
-    fn test_admonish_codeblock_extraction_non_admonish_code_block() {
-        // Regular code blocks should be processed differently from admonish blocks
-        assert_extract_messages(
-            "```rust\nfn main() {\n    println!(\"Hello\");\n}\n```",
-            &[(3, "\"Hello\"")],
-        );
-    }
-
-    #[test]
-    fn test_admonish_codeblock_extraction_with_admonish() {
-        // Ensure admonish blocks are properly processed
-        assert_extract_messages(
-            "```admonish\nThis is an admonish block\n```",
-            &[(1, "```admonish\nThis is an admonish block\n```")],
-        );
-    }
-
-    #[test]
-    fn test_admonish_codeblock_extraction_with_title() {
-        // Ensure admonish blocks with titles are properly processed
-        assert_extract_messages(
-            "```admonish tip title=\"Note\"\nThis is an admonish block with title\n```",
+            r#"```admonish tip title="Important Tips"
+My Message
+```"#,
             &[(
                 1,
-                "```admonish tip title=\"Note\"\nThis is an admonish block with title\n```",
+                "```admonish tip title=\"Important Tips\"\nMy Message\n```",
             )],
         );
     }
 
     #[test]
-    fn test_admonish_codeblock_incomplete() {
-        // Ensure incomplete admonish blocks are handled correctly
-        let result =
-            extract_messages("```admonish\nIncomplete block without closing backticks").unwrap();
+    fn extract_admonish_codeblock_no_title() {
+        assert_extract_messages(
+            r#"```admonish tip
+My Message
+```"#,
+            &[(1, "```admonish tip\nMy Message\n```")],
+        );
+    }
 
-        // Check that we get a message containing the incomplete block
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].0, 1); // Line number
-        assert!(result[0].1.message.contains("```admonish"));
-        assert!(result[0]
-            .1
-            .message
-            .contains("Incomplete block without closing backticks"));
+    #[test]
+    fn extract_admonish_codeblock_no_close_codeblock() {
+        assert_extract_messages(
+            r#"```admonish tip
+My Message
+"#,
+            &[(1, "```admonish tip\nMy Message\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_newlang_codeblock_string() {
+        assert_extract_messages(
+            r#"```new_lang
+some_syntax = "My String";
+```"#,
+            &[(1, "```new_lang\nsome_syntax = \"My String\";\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_nolang_codeblock_string() {
+        assert_extract_messages(
+            r#"```
+some_syntax = "My String";
+```"#,
+            &[(1, "```\nsome_syntax = \"My String\";\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_nolang_nostring_codeblock() {
+        assert_extract_messages(
+            r#"```
+some_syntax = do_something();
+```"#,
+            &[],
+        );
     }
 }

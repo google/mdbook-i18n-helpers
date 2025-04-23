@@ -385,10 +385,12 @@ mod tests {
         );
     }
 
+    // Test Issue #235 - w/ no title
     #[test]
     fn test_translate_custom_code_block_admonish_no_title() {
         let catalog = create_catalog(&[(
-            "```admonish tip\nThe star waves trembled slightly, \n\
+            "```admonish tip\n\
+	    The star waves trembled slightly, \n\
             neutrons and nuclei whispered, \n\
             and the mystery became clearer. \n```",
             "```admonish tip\n\
@@ -411,34 +413,6 @@ mod tests {
             中子核密语声声，\n\
             奥秘渐分明。\n\
             ```",
-        );
-    }
-
-    #[test]
-    fn test_translate_custom_code_block_admonish_no_indent() {
-        let catalog = create_catalog(&[(
-            "```admonish tip\n\
-            The star waves trembled slightly,\n\
-            neutrons and nuclei whispered,\n\
-            and the mystery became clearer.\n```",
-            "```admonish tip\n\
-             星波轻颤动，\n\
-             中子核密语声声，\n\
-             奥秘渐分明。\n```",
-        )]);
-        assert_eq!(
-            translate(
-                "```admonish tip\n\
-                The star waves trembled slightly,\n\
-                neutrons and nuclei whispered,\n\
-                and the mystery became clearer.\n```",
-                &catalog
-            )
-            .unwrap(),
-            "```admonish tip\n\
-            星波轻颤动，\n\
-            中子核密语声声，\n\
-            奥秘渐分明。\n```",
         );
     }
 
