@@ -276,6 +276,146 @@ mod tests {
         );
     }
 
+    // Multiple line comments in a row in a code block
+    #[test]
+    fn test_translate_code_block_multiple_line_comments() {
+        let catalog = create_catalog(&[(
+            "// Fun fact\n\
+              // \n\
+              // The star waves trembled slightly,\n\
+              // neutrons and nuclei whispered,\n\
+              // and the mystery became clearer.\n",
+            "// 趣味事实\n\
+              // \n\
+              // 星波轻颤动，\n\
+              // 中子核密语声声，\n\
+              // 奥秘渐分明。\n",
+        )]);
+        assert_eq!(
+            translate(
+                "```c++\n\
+                // Fun fact\n\
+                // \n\
+                // The star waves trembled slightly,\n\
+                // neutrons and nuclei whispered,\n\
+                // and the mystery became clearer.\n\
+                ```",
+                &catalog
+            )
+            .unwrap(),
+            "```c++\n\
+            // 趣味事实\n\
+            // \n\
+            // 星波轻颤动，\n\
+            // 中子核密语声声，\n\
+            // 奥秘渐分明。\n\
+            ```",
+        );
+    }
+
+    // Multiple line block comment in a code block
+    #[test]
+    fn test_translate_code_block_multiline_block_comment() {
+        let catalog = create_catalog(&[(
+            "/* Fun fact\n\
+               * \n\
+               * The star waves trembled slightly,\n\
+               * neutrons and nuclei whispered,\n\
+               * and the mystery became clearer.\n\
+               */",
+            "/* 趣味事实\n\
+               * \n\
+               * 星波轻颤动，\n\
+               * 中子核密语声声，\n\
+               * 奥秘渐分明。\n\
+               */",
+        )]);
+        assert_eq!(
+            translate(
+                "```c++\n\
+                /* Fun fact\n\
+                 * \n\
+                 * The star waves trembled slightly,\n\
+                 * neutrons and nuclei whispered,\n\
+                 * and the mystery became clearer.\n\
+                 */\n\
+                ```",
+                &catalog
+            )
+            .unwrap(),
+            "```c++\n\
+            /* 趣味事实\n\
+             * \n\
+             * 星波轻颤动，\n\
+             * 中子核密语声声，\n\
+             * 奥秘渐分明。\n\
+             */\n\
+            ```",
+        );
+    }
+
+    // Test Issue #235
+    #[test]
+    fn test_translate_custom_code_block_admonish() {
+        let catalog = create_catalog(&[(
+            "```admonish tip title=\"Fun fact\"\n\
+            The star waves trembled slightly, \n\
+            neutrons and nuclei whispered, \n\
+            and the mystery became clearer. \n```",
+            "```admonish tip title=\"趣味事实\"\n\
+             星波轻颤动，\n\
+             中子核密语声声，\n\
+             奥秘渐分明。\n```",
+        )]);
+        assert_eq!(
+            translate(
+                "```admonish tip title=\"Fun fact\"\n\
+                The star waves trembled slightly, \n\
+                neutrons and nuclei whispered, \n\
+                and the mystery became clearer. \n\
+                ```",
+                &catalog
+            )
+            .unwrap(),
+            "```admonish tip title=\"趣味事实\"\n\
+            星波轻颤动，\n\
+            中子核密语声声，\n\
+            奥秘渐分明。\n\
+            ```",
+        );
+    }
+
+    // Test Issue #235 - w/ no title
+    #[test]
+    fn test_translate_custom_code_block_admonish_no_title() {
+        let catalog = create_catalog(&[(
+            "```admonish tip\n\
+	    The star waves trembled slightly, \n\
+            neutrons and nuclei whispered, \n\
+            and the mystery became clearer. \n```",
+            "```admonish tip\n\
+             星波轻颤动，\n\
+             中子核密语声声，\n\
+             奥秘渐分明。\n```",
+        )]);
+        assert_eq!(
+            translate(
+                "```admonish tip\n\
+                The star waves trembled slightly, \n\
+                neutrons and nuclei whispered, \n\
+                and the mystery became clearer. \n\
+                ```",
+                &catalog
+            )
+            .unwrap(),
+            "```admonish tip\n\
+            星波轻颤动，\n\
+            中子核密语声声，\n\
+            奥秘渐分明。\n\
+            ```",
+        );
+    }
+
     #[test]
     fn test_translate_inline_html() {
         let catalog = create_catalog(&[("foo <b>bar</b> baz", "FOO <b>BAR</b> BAZ")]);

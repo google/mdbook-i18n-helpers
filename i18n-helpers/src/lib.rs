@@ -477,6 +477,41 @@ fn heuristic_codeblock<'a>(
     Ok((groups, ctx))
 }
 
+/// Special Admonish "codeblock" - extract the body content for translation
+/// If a title is present, also extract that for translation
+/// Note this is from mdbook-admonish: https://github.com/tommilligan/mdbook-admonish
+/// This assumes it is called by `parse_codeblock()` when `is_admonish() == true`
+fn admonish_codeblock<'a>(
+    events: &'a [(usize, Event<'_>)],
+    mut ctx: GroupingContext,
+) -> Result<(Vec<Group<'a>>, GroupingContext), CmarkError> {
+    // Handle the entire block as a single translatable unit
+    // The translate_events function will take care of matching the proper translations
+    // for both the title and body content based on the PO file entries
+    let groups = vec![Group::Translate {
+        events: events.into(),
+        comment: std::mem::take(&mut ctx.comments).join(" "),
+    }];
+
+    Ok((groups, ctx))
+}
+
+/// Check if the code block is an admonish block
+fn is_admonish(events: &[(usize, Event<'_>)]) -> bool {
+    const ADMONISH_CODEBLOCK_NAME: &str = "admonish";
+
+    // pull the info_string (aka language specifier) out of the code block
+    // (the string after the ```)
+    match events {
+        [(_, Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(info_string)))), .., (_, Event::End(TagEnd::CodeBlock))] =>
+        {
+            // Check if the language specifier contains "admonish"
+            matches!(info_string.split_once(' '), Some((keyword, _)) if keyword == ADMONISH_CODEBLOCK_NAME)
+        }
+        _ => false,
+    }
+}
+
 /// Creates groups by parsing codeblock.
 fn parse_codeblock<'a>(
     events: &'a [(usize, Event<'_>)],
@@ -493,8 +528,12 @@ fn parse_codeblock<'a>(
     };
 
     let Some(syntax) = syntax else {
-        // If there is no language specifier, falling back to heuristic way.
-        return heuristic_codeblock(events, ctx);
+        if is_admonish(events) {
+            return admonish_codeblock(events, ctx);
+        } else {
+            // If there is no language specifier, falling back to heuristic way.
+            return heuristic_codeblock(events, ctx);
+        }
     };
 
     let mut ps = ParseState::new(syntax);
@@ -1794,6 +1833,69 @@ print("Hello world")
                     comment: "greetings!".into(),
                 }
             ),]
+        );
+    }
+
+    #[test]
+    fn extract_admonish_codeblock() {
+        assert_extract_messages(
+            r#"```admonish tip title="Important Tips"
+My Message
+```"#,
+            &[(
+                1,
+                "```admonish tip title=\"Important Tips\"\nMy Message\n```",
+            )],
+        );
+    }
+
+    #[test]
+    fn extract_admonish_codeblock_no_title() {
+        assert_extract_messages(
+            r#"```admonish tip
+My Message
+```"#,
+            &[(1, "```admonish tip\nMy Message\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_admonish_codeblock_no_close_codeblock() {
+        assert_extract_messages(
+            r#"```admonish tip
+My Message
+"#,
+            &[(1, "```admonish tip\nMy Message\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_newlang_codeblock_string() {
+        assert_extract_messages(
+            r#"```new_lang
+some_syntax = "My String";
+```"#,
+            &[(1, "```new_lang\nsome_syntax = \"My String\";\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_nolang_codeblock_string() {
+        assert_extract_messages(
+            r#"```
+some_syntax = "My String";
+```"#,
+            &[(1, "```\nsome_syntax = \"My String\";\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_nolang_nostring_codeblock() {
+        assert_extract_messages(
+            r#"```
+some_syntax = do_something();
+```"#,
+            &[],
         );
     }
 }

@@ -155,6 +155,16 @@ after = ["links"]
 This will run `mdbook-gettext` on the source after things like `{{ #include }}`
 has been executed. This makes it possible to translate included source code.
 
+Note, if you are using `mdbook-admonish` ([reference][1]), then you need to
+ensure that `mdbook-gettext` runs prior to `mdbook-admonish` by modifying your
+`book.toml` file like so:
+
+```toml
+[preprocessor.gettext]
+before = ["admonish"]
+after = ["links"]
+```
+
 You can leave `mdbook-gettext` enabled: if no language is set or if it cannot
 find the `.po` file corresponding to the language (e.g., it cannot find
 `po/en.po` for English), then it will return the book untranslated.
@@ -302,3 +312,5 @@ msgstr "BAR"
 
 You will only need to run `mdbook-i18n-normalize` once after upgrading
 mdbook-i18n-helpers.
+
+[1]: https://github.com/tommilligan/mdbook-admonish
