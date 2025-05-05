@@ -23,7 +23,7 @@ pulldown-cmark-to-cmark = "21.0.0"
 regex = "1.11"
 semver = "1.0.26"
 serde_json.workspace = true
-syntect = { version = "5.2.0", default-features = false, features = ["parsing", "default-syntaxes", "regex-onig"] }
+syntect = { version = "5.2.0", default-features = false, features = ["parsing", "default-syntaxes", "regex-fancy"] }
 textwrap = { version = "0.16.2", default-features = false }
 
 [dev-dependencies]
