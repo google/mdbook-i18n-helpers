@@ -13,18 +13,6 @@ use walkdir::WalkDir;
 use zip::result::ZipError;
 use zip::write::SimpleFileOptions;
 use std::fs::File;
-fn main() {
-  let args: Vec<String> = env::args().collect();
-
-  parse_args(&args);
-
-  println!("::endgroup::");
-}
-
-struct TranslateHelperConfig {
-  book_lang: String,
-  dest_dir: String
-}
 
 fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
   if locale == "en" {
@@ -125,24 +113,26 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
 }
 
 
-// should run msmerge
-fn update_translation(locale: String, dest_dir: String) {
-  print!("Updating translation for locale {locale} and destination directory {dest_dir}")
+fn update() {
+  unimplemented!("update has not been implemented yet")
 }
 
-fn translate_all() {
-  // let languages = env::var("LANGUAGES");
-  if let Ok(languages) = env::var("LANGUAGES") {
-    println!("Translation all languages in $LANGUAGES: {languages}");
-    languages.split(" ").for_each(| lang | -> () {
-      println!("translation language {lang}");
-    });
-  } else {
-    panic!("Error reading environment variable LANGUAGES. Has it been set correctly?")
+fn build(dest_dir: String) -> Result<(), Error>{
+  match env::var("LANGUAGES") {
+    Ok(languages) => {
+      for language in languages.split(" ") {
+        match build_translation(language.to_string(), dest_dir.clone()) {
+          Ok(_) => (),
+          Err(err) => return Err(err.into())
+        }
+      }
+      return Ok(())
+    },
+    Err(err) => return Err(err.into())
   }
 }
 
-fn parse_args(args: &[String]) -> () {
+fn run_helper(args: &[String]) -> () {
   let cmd_name = &args[0];
 
   if args.len() == 1 {
@@ -152,22 +142,28 @@ fn parse_args(args: &[String]) -> () {
 
   match translate_action.as_str() {
     "build" | "update" => {
-      if args.len() != 4 {
-        panic!("Usage: {cmd_name} <book-lang> <dest-dir>");
+      if args.len() != 3 {
+        panic!("Usage: {cmd_name} <dest-dir>");
       }
-      let config = TranslateHelperConfig { book_lang: args[2].clone(), dest_dir: args[3].clone() };
 
       if translate_action.as_str() == "build" {
-        match build_translation(config.book_lang, config.dest_dir) {
+        match build(args[2].clone()) {
           Ok(_) => (),
-          Err(err) => panic!("::endgroup::Error building translation: {}", err)
+          Err(err) => panic!("::endgroup::Error building translations: {}", err)
         }
       } else {
-        update_translation(config.book_lang, config.dest_dir);
+        update();
       }
     },
-    "all" => translate_all(),
-    _ => panic!("Supported commands are `build`, `update` and `all`")
+    _ => panic!("Supported commands are `build` and `update`")
   };
 
+}
+
+fn main() {
+  let args: Vec<String> = env::args().collect();
+
+  run_helper(&args);
+
+  println!("::endgroup::");
 }
