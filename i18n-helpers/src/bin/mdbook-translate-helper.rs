@@ -108,6 +108,9 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
   }
   zip.finish()?;
 
+  // clean up repository
+  Command::new("git").args(["reset","--hard"]).output()?;
+
   Ok(())
 }
 
