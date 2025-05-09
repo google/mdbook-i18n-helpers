@@ -67,7 +67,6 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
 
   // Disable the redbox button in built versions of the course
   fs::write(format!("{}/html/theme/redbox.js", dest_dir), "// Disabled in published builds, see build.sh")?;
-
   let pdf_from_dir = format!("{}/pandoc/pdf/comprehensive-rust.pdf", dest_dir);
   let pdf_dest_dir = format!("{}/html/comprehensive-rust.pdf", dest_dir);
 
@@ -117,11 +116,12 @@ fn update() {
   unimplemented!("update has not been implemented yet")
 }
 
-fn build(dest_dir: String) -> Result<(), Error>{
+fn build(dir: &str) -> Result<(), Error>{
   match env::var("LANGUAGES") {
     Ok(languages) => {
       for language in languages.split(" ") {
-        match build_translation(language.to_string(), dest_dir.clone()) {
+        let dest_dir = dir.to_owned() + "/" + language;
+        match build_translation(language.to_string(), dest_dir) {
           Ok(_) => (),
           Err(err) => return Err(err.into())
         }
@@ -147,7 +147,8 @@ fn run_helper(args: &[String]) -> () {
       }
 
       if translate_action.as_str() == "build" {
-        match build(args[2].clone()) {
+        let dir = args[2].clone();
+        match build(&dir) {
           Ok(_) => (),
           Err(err) => panic!("::endgroup::Error building translations: {}", err)
         }
