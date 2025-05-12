@@ -9,7 +9,7 @@ print_stdout = "warn"
 print_stderr = "warn"
 
 [workspace.dependencies]
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 mdbook = { version = "0.4.48", default-features = false }
 polib = "0.2.0"
 pretty_assertions = "1.4.1"
