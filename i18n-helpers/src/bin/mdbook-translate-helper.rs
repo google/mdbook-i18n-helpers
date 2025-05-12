@@ -115,8 +115,18 @@ fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
 }
 
 
-fn update() {
-  unimplemented!("update has not been implemented yet")
+fn update(filename: &str) -> Result<(), Error> {
+  match Command::new("mdbook").arg("build").output() {
+    Ok(_) => (),
+    Err(err) => return Err(err.into())
+  };
+
+  match Command::new("msgmerge").args(["--update", filename, "book/xgettext/messages.pot"]).output() {
+    Ok(_) => (),
+    Err(err) => return Err(err.into())
+  };
+
+  Ok(())
 }
 
 fn build(dir: &str) -> Result<(), Error>{
@@ -141,22 +151,31 @@ fn run_helper(args: &[String]) -> () {
   if args.len() == 1 {
       panic!("No arguments provided. Usage {cmd_name} <action>")
   }
-  let translate_action = args[1].clone();
+  let action = args[1].clone();
 
-  match translate_action.as_str() {
-    "build" | "update" => {
+  match action.as_str() {
+    "build" => {
       if args.len() != 3 {
         panic!("Usage: {cmd_name} <dest-dir>");
       }
+      let dir = args[2].clone();
 
-      if translate_action.as_str() == "build" {
-        let dir = args[2].clone();
-        match build(&dir) {
-          Ok(_) => (),
-          Err(err) => panic!("::endgroup::Error building translations: {}", err)
-        }
-      } else {
-        update();
+      match build(&dir) {
+        Ok(_) => (),
+        Err(err) => panic!("::group::Error building translations: {}", err)
+      }
+    },
+    "update" => {
+      if args.len() != 3 {
+        panic!("Usage: {cmd_name} <locale>");
+      }
+      let locale = args[2].clone();
+      let filename = format!("po/{locale}.po");
+
+      println!("::group::Updating {locale} translation");
+      match update(&filename) {
+        Ok(_) => (),
+        Err(err) => panic!("::group::Error updating translation: {}", err)
       }
     },
     _ => panic!("Supported commands are `build` and `update`")
