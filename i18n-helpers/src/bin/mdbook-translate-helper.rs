@@ -1,0 +1,192 @@
+use std::env;
+use std::fs;
+use std::io;
+use std::io::BufRead;
+use std::io::Read;
+use std::io::Write;
+use::std::path::Path;
+use std::process::Command;
+use anyhow::Context;
+use anyhow::Error;
+use chrono;
+use walkdir::WalkDir;
+use zip::result::ZipError;
+use zip::write::SimpleFileOptions;
+use std::fs::File;
+
+fn build_translation(locale: String, dest_dir: String) -> Result<(), Error>{
+  if locale == "en" {
+    println!("::group::Building English course");
+  } else {
+    let locale_ref = &locale;
+    let file = fs::File::open(format!("po/{locale_ref}.po"))?;
+    let reader = io::BufReader::new(file);
+
+    let mut pot_creation_date: Option<String> = None;
+
+    for line in reader.lines() {
+      let line = line.expect("Error reading line");
+      if line.contains("POT-Creation-Date") {
+        let line_parts: Vec<&str> = line.split(":").collect();
+        pot_creation_date = Some(line_parts[1].trim_start().to_string());
+        break;
+      }
+    }
+
+    if pot_creation_date.is_none() {
+      let now = chrono::Local::now();
+      pot_creation_date = Some(now.format("%Y-%m-%dT%H:%M:%S").to_string());
+    }
+
+    println!("::group::Building {locale_ref} translation as of {:?}", pot_creation_date.clone().unwrap());
+
+    // Back-date the source to POT-Creation-Date. The content lives in two directories:
+    fs::remove_dir_all("src")?;
+    fs::remove_dir_all("third_party")?;
+
+    let output = Command::new("git").args(["rev-list", "-n", "1", "--before", &pot_creation_date.unwrap(), "@"]).output().unwrap();
+    let result_str= String::from_utf8(output.stdout).unwrap().replace("\n", "");
+
+    Command::new("git").args(["restore","--source", &result_str, "src/", "third_party/"]).output()?;
+
+    env::set_var("MDBOOK_BOOK__LANGUAGE", locale_ref);
+    env::set_var("MDBOOK_OUTPUT__HTML__SITE_URL", format!("/comprehensive-rust/{locale_ref}/"));
+    env::set_var("MDBOOK_OUTPUT__HTML__REDIRECT", "{}");
+  }
+
+  // Enable mdbook-pandoc to build PDF version of the course
+  env::set_var("MDBOOK_OUTPUT__PANDOC__DISABLED", "false");
+
+  let dest_arg = format!("-d{dest_dir}");
+  match Command::new("mdbook").arg("build").arg(dest_arg).output() {
+    Ok(_) => (),
+    Err(err) => {
+      return Err(err.into());
+    }
+  }
+
+  // Disable the redbox button in built versions of the course
+  fs::write(format!("{}/html/theme/redbox.js", dest_dir), "// Disabled in published builds, see build.sh")?;
+  let pdf_from_dir = format!("{}/pandoc/pdf/comprehensive-rust.pdf", dest_dir);
+  let pdf_dest_dir = format!("{}/html/comprehensive-rust.pdf", dest_dir);
+
+  let pdf_from_path = Path::new(&pdf_from_dir);
+  let pdf_dest_path = Path::new(&pdf_dest_dir);
+
+  fs::copy(pdf_from_path, pdf_dest_path)?;
+  fs::remove_file(pdf_from_path)?;
+
+  let src_dir = format!("{dest_dir}/exerciser/comprehensive-rust-exercises");
+  let src_path = Path::new(&src_dir);
+  if !src_path.is_dir() {
+    return Err(ZipError::FileNotFound.into());
+  }
+
+  let zip_file_str = format!("{dest_dir}/html/comprehensive-rust-exercises.zip");
+  let zip_file = File::create(Path::new(&zip_file_str))?;
+
+  let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+  let mut zip = zip::ZipWriter::new(zip_file);
+  let mut buffer = Vec::new();
+
+  for entry in WalkDir::new(src_path).into_iter().filter_map(|e| e.ok()) {
+    let path = entry.path();
+    let name = path.strip_prefix(src_path)?;
+    let name_as_str = name.to_str().map(str::to_owned).with_context(|| format!("{name:?} is a non utf-8 path"))?;
+
+    if path.is_file() {
+      zip.start_file(name_as_str, options)?;
+      let mut f = File::open(path)?;
+
+      f.read_to_end(&mut buffer)?;
+      zip.write_all(&buffer)?;
+      buffer.clear();
+    } else if !name.as_os_str().is_empty() {
+      zip.add_directory(name_as_str, options)?;
+    }
+  }
+  zip.finish()?;
+
+  // clean up repository
+  Command::new("git").args(["reset","--hard"]).output()?;
+
+  Ok(())
+}
+
+
+fn update(filename: &str) -> Result<(), Error> {
+  match Command::new("mdbook").arg("build").output() {
+    Ok(_) => (),
+    Err(err) => return Err(err.into())
+  };
+
+  match Command::new("msgmerge").args(["--update", filename, "book/xgettext/messages.pot"]).output() {
+    Ok(_) => (),
+    Err(err) => return Err(err.into())
+  };
+
+  Ok(())
+}
+
+fn build(dir: &str) -> Result<(), Error>{
+  match env::var("LANGUAGES") {
+    Ok(languages) => {
+      for language in languages.split(" ") {
+        let dest_dir = dir.to_owned() + "/" + language;
+        match build_translation(language.to_string(), dest_dir) {
+          Ok(_) => (),
+          Err(err) => return Err(err.into())
+        }
+      }
+      return Ok(())
+    },
+    Err(err) => return Err(err.into())
+  }
+}
+
+fn run_helper(args: &[String]) -> () {
+  let cmd_name = &args[0];
+
+  if args.len() == 1 {
+      panic!("No arguments provided. Usage {cmd_name} <action>")
+  }
+  let action = args[1].clone();
+
+  match action.as_str() {
+    "build" => {
+      if args.len() != 3 {
+        panic!("Usage: {cmd_name} <dest-dir>");
+      }
+      let dir = args[2].clone();
+
+      match build(&dir) {
+        Ok(_) => (),
+        Err(err) => panic!("::group::Error building translations: {}", err)
+      }
+    },
+    "update" => {
+      if args.len() != 3 {
+        panic!("Usage: {cmd_name} <locale>");
+      }
+      let locale = args[2].clone();
+      let filename = format!("po/{locale}.po");
+
+      println!("::group::Updating {locale} translation");
+      match update(&filename) {
+        Ok(_) => (),
+        Err(err) => panic!("::group::Error updating translation: {}", err)
+      }
+    },
+    _ => panic!("Supported commands are `build` and `update`")
+  };
+
+}
+
+fn main() {
+  let args: Vec<String> = env::args().collect();
+
+  run_helper(&args);
+
+  println!("::endgroup::");
+}
