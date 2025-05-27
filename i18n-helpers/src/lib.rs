@@ -125,7 +125,7 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
     }
 
     // Perform some common transformations on the events
-    fn convert_event_common<'a>(event: Event<'a>) -> Event<'a> {
+    fn convert_event_common(event: Event<'_>) -> Event<'_> {
         match event {
             Event::SoftBreak => Event::Text(" ".into()),
             // Shortcut links like "[foo]" end up as "[foo]"
