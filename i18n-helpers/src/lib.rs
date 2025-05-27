@@ -69,8 +69,11 @@ pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
 /// Extract Markdown events from `text`.
 ///
 /// The `state` can be used to give the parsing context. In
-/// particular, if a code block has started, the text should be parsed
-/// without interpreting special Markdown characters.
+/// particular:
+///
+/// - If a code block has started, the text should be parsed
+///   without interpreting special Markdown characters.
+/// - In a table cell, the text should be parsed as inlines.
 ///
 /// The events are labeled with the line number where they start in
 /// the document.
@@ -122,6 +125,21 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
         }
     }
 
+    // Perform some common transformations on the events
+    fn convert_event_common(event: Event<'_>) -> Event<'_> {
+        match event {
+            Event::SoftBreak => Event::Text(" ".into()),
+            // Shortcut links like "[foo]" end up as "[foo]"
+            // in output. By changing them to a reference
+            // link, the link is expanded on the fly and the
+            // output becomes self-contained.
+            Event::Start(tag @ (Tag::Link { .. } | Tag::Image { .. })) => {
+                Event::Start(expand_shortcut_link(tag))
+            }
+            _ => event,
+        }
+    }
+
     // Offsets of each newline in the input, used to calculate line
     // numbers from byte offsets.
     let offsets = text
@@ -138,23 +156,29 @@ pub fn extract_events<'a>(text: &'a str, state: Option<State<'a>>) -> Vec<(usize
             .enumerate()
             .map(|(idx, line)| (idx + 1, Event::Text(line.into())))
             .collect(),
+        // If we're in a table cell, we put the text in a minimal table, parse the
+        // table, and return the contents of the cell. This matches the behavior of
+        // the parser in this case.
+        Some(state) if state.in_table_cell => {
+            let text = format!("|{text}|\n|-|");
+            new_cmark_parser::<'_, DefaultBrokenLinkCallback>(&text, None)
+                .filter_map(|event| {
+                    if let Event::Start(Tag::Table(..) | Tag::TableHead | Tag::TableCell)
+                    | Event::End(TagEnd::Table | TagEnd::TableHead | TagEnd::TableCell) = event
+                    {
+                        return None;
+                    }
+                    // The line number is always 1 because tables don't allow newlines
+                    Some((1, convert_event_common(event).into_static()))
+                })
+                .collect()
+        }
         // Otherwise, we parse the text line normally.
         _ => new_cmark_parser::<'a, DefaultBrokenLinkCallback>(text, None)
             .into_offset_iter()
             .map(|(event, range)| {
                 let lineno = offsets.partition_point(|&o| o < range.start) + 1;
-                let event = match event {
-                    Event::SoftBreak => Event::Text(" ".into()),
-                    // Shortcut links like "[foo]" end up as "[foo]"
-                    // in output. By changing them to a reference
-                    // link, the link is expanded on the fly and the
-                    // output becomes self-contained.
-                    Event::Start(tag @ (Tag::Link { .. } | Tag::Image { .. })) => {
-                        Event::Start(expand_shortcut_link(tag))
-                    }
-                    _ => event,
-                };
-                (lineno, event)
+                (lineno, convert_event_common(event))
             })
             .collect(),
     }
@@ -891,6 +915,7 @@ pub fn translate_events<'a>(
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use pulldown_cmark::Alignment;
     use pulldown_cmark::CodeBlockKind;
     use pulldown_cmark::Event::*;
     use pulldown_cmark::HeadingLevel::*;
@@ -1013,6 +1038,34 @@ mod tests {
                 (2, Start(Paragraph)),
                 (2, Text("Hello".into())),
                 (2, End(TagEnd::Paragraph)),
+            ]
+        );
+    }
+
+    #[test]
+    fn extract_events_html_block() {
+        let (_, state) = reconstruct_markdown(
+            &[
+                (1, Start(Table(vec![Alignment::None]))),
+                (1, Start(TableHead)),
+                (1, Start(TableCell)),
+            ],
+            None,
+        )
+        .unwrap();
+        // Should be parsed as an inline in a table.
+        assert_eq!(
+            extract_events("<img />", Some(state)),
+            vec![(1, InlineHtml("<img />".into()))]
+        );
+
+        // Compare with extraction without state:
+        assert_eq!(
+            extract_events("<img />", None),
+            vec![
+                (1, Start(HtmlBlock)),
+                (1, Html("<img />".into())),
+                (1, End(TagEnd::HtmlBlock)),
             ]
         );
     }
