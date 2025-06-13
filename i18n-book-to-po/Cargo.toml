@@ -1,0 +1,19 @@
+[package]
+name = "i18n-book-to-po"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4.5.38", features = ["derive"] }
+lcs-diff = "0.1.1"
+mdbook.workspace = true
+mdbook-i18n-helpers = { version = "0.3.6", path = "../i18n-helpers" }
+polib.workspace = true
+pulldown-cmark = "0.13"
+# This is a cloned repository with a fix that needs to be accepted upstream
+seal = { git = "https://github.com/michael-kerscher/rust-seal.git" }
+slice-diff-patch = "1.2.4"
+
+[lints]
+workspace = true
