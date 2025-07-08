@@ -1,6 +1,6 @@
 [workspace]
-members = ["i18n-helpers", "i18n-report", "mdbook-tera-backend", "fuzz"]
-default-members = ["i18n-helpers", "i18n-report", "mdbook-tera-backend"]
+members = ["i18n-book-to-po","i18n-helpers", "i18n-report", "mdbook-tera-backend", "fuzz"]
+default-members = ["i18n-book-to-po", "i18n-helpers", "i18n-report",  "mdbook-tera-backend"]
 resolver = "2"
 
 [workspace.lints.clippy]
