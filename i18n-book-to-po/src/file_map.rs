@@ -3,6 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use log::warn;
+
 /// Try to map markdown files from the two given folders. Missing files will be ignored
 pub fn auto_folders_match(
     source_base: &Path,
@@ -24,8 +26,8 @@ pub fn auto_folders_match(
         if translation_filenames.contains(&translation_target_file) {
             map.push((source_file, translation_target_file));
         } else {
-            println!(
-                "warning: no matching translation file found for '{}'",
+            warn!(
+                "no matching translation file found for '{}'",
                 source_file.display()
             );
         }

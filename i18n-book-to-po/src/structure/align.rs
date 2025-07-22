@@ -1,5 +1,6 @@
 use std::vec;
 
+use log::error;
 use mdbook_i18n_helpers::reconstruct_markdown;
 use pulldown_cmark::Event;
 
@@ -12,7 +13,6 @@ use crate::structure::{
 /// This is splitting by "." and replacing these elements by a Vector of Sentence Elements
 fn generate_sentence_structure(text: &str) -> Vec<CmarkEvent> {
     text.split(".")
-        .into_iter()
         .filter_map(|sentence| {
             if sentence.is_empty() {
                 None
@@ -26,7 +26,7 @@ fn generate_sentence_structure(text: &str) -> Vec<CmarkEvent> {
 /// Parse the structure of the provided cmark events and return a Markdown structure
 /// It leverages additional sentence elements as structural elements if feature_sentence is set
 fn parse_structure(
-    markdown: &Vec<pulldown_cmark::Event<'_>>,
+    markdown: &[pulldown_cmark::Event<'_>],
     feature_sentence: bool,
 ) -> Vec<CmarkEvent> {
     let structure: Vec<_> = markdown
@@ -38,7 +38,7 @@ fn parse_structure(
                 if let pulldown_cmark::Event::Text(text) = event {
                     // prepend the sentence elements with the Text variant
                     let mut result = vec![(event).into()];
-                    result.extend(generate_sentence_structure(&text));
+                    result.extend(generate_sentence_structure(text));
                     return result;
                 }
             };
@@ -46,7 +46,7 @@ fn parse_structure(
         })
         .collect();
 
-    return structure;
+    structure
 }
 
 /// normalize the event stream
@@ -67,7 +67,7 @@ fn normalize_events(events: Vec<pulldown_cmark::Event>) -> Vec<pulldown_cmark::E
                         normalized_events.last_mut()
                     {
                         // merge text events (with space as this is a soft break)
-                        *prev_text = format!("{} {}", prev_text, text).into();
+                        *prev_text = format!("{prev_text} {text}").into();
                     } else {
                         // add the text event unmodified
                         normalized_events.push(pulldown_cmark::Event::Text(text));
@@ -100,7 +100,7 @@ fn read_structure(content: &str) -> anyhow::Result<Vec<pulldown_cmark::Event<'_>
     opts.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
     opts.insert(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
 
-    Ok(pulldown_cmark::Parser::new_ext(&content, opts).collect())
+    Ok(pulldown_cmark::Parser::new_ext(content, opts).collect())
 }
 
 /// apply the diff to align the markdown events.
@@ -159,13 +159,7 @@ fn minimize_aligned_events<'a>(
     source
         .into_iter()
         .zip(translated)
-        .filter_map(|(s, t)| {
-            if s.is_some() && t.is_some() {
-                Some((s.unwrap(), t.unwrap()))
-            } else {
-                None
-            }
-        })
+        .filter_map(|(s, t)| s.zip(t))
         .unzip()
 }
 
@@ -173,15 +167,15 @@ fn minimize_aligned_events<'a>(
 /// that don't have a pendant in the other document. This is mostly useful for debugging if the
 /// markdown cannot be properly reconstructed.
 fn debug_get_unaligned_events<'a>(
-    source: Vec<Option<Event<'a>>>,
-    translated: Vec<Option<Event<'a>>>,
-) -> (Vec<Option<Event<'a>>>, Vec<Option<Event<'a>>>) {
+    source: &'a [Option<Event<'a>>],
+    translated: &'a [Option<Event<'a>>],
+) -> (Vec<Option<&'a Event<'a>>>, Vec<Option<&'a Event<'a>>>) {
     source
-        .into_iter()
+        .iter()
         .zip(translated)
         .filter_map(|(s, t)| {
             if s.is_none() || t.is_none() {
-                Some((s, t))
+                Some((s.as_ref(), t.as_ref()))
             } else {
                 None
             }
@@ -238,13 +232,12 @@ pub fn align_markdown_docs(
         None,
     );
     if let Err(e) = reconstructed_source {
-        println!("Error reconstructing source markdown: {:?}", e);
-        dbg!(&aligned_source);
-        dbg!(&aligned_translated);
-        dbg!(debug_get_unaligned_events(
-            aligned_source,
-            aligned_translated
-        ));
+        error!(
+            "Reconstructing source markdown: {e:?}\n{:?}\n{:?}\n{:?}",
+            &aligned_source,
+            &aligned_translated,
+            debug_get_unaligned_events(&aligned_source, &aligned_translated)
+        );
         return Err(e.into());
     }
     let reconstructed_source = reconstructed_source.unwrap();
@@ -257,13 +250,12 @@ pub fn align_markdown_docs(
         None,
     );
     if let Err(e) = reconstructed_translated {
-        println!("Error reconstructing translated markdown: {:?}", e);
-        dbg!(&aligned_source);
-        dbg!(&aligned_translated);
-        dbg!(debug_get_unaligned_events(
-            aligned_source,
-            aligned_translated
-        ));
+        error!(
+            "Reconstructing translated markdown: {e:?}\n{:?}\n{:?}\n{:?}",
+            &aligned_source,
+            &aligned_translated,
+            debug_get_unaligned_events(&aligned_source, &aligned_translated)
+        );
         return Err(e.into());
     }
     let reconstructed_translated = reconstructed_translated.unwrap();
@@ -489,14 +481,14 @@ new sentence";
             .into_iter()
             .flatten()
             .cloned()
-            .collect();
+            .collect::<Vec<_>>();
 
         // the untranslated paragraph is missing but a new sentence was added by the translator
         let translated_events = [&translated_a, &translated_b, &new_paragraph_in_translation]
             .into_iter()
             .flatten()
             .cloned()
-            .collect();
+            .collect::<Vec<_>>();
         let original_structure = parse_structure(&original_events, false);
         let translated_structure = parse_structure(&translated_events, false);
         let diff = diff_structure(

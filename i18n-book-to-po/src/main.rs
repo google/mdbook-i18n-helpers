@@ -4,11 +4,12 @@ use std::{
 };
 
 use anyhow::Ok;
-use clap::{arg, Parser as _};
+use clap::{Parser as _, arg};
 use i18n_book_to_po::{
     catalog, file_map,
     structure::{align::align_markdown_docs, types::DiffAlgorithm},
 };
+use log::{info, warn};
 use mdbook_i18n_helpers::extract_messages;
 
 #[derive(clap::Parser)]
@@ -57,8 +58,9 @@ fn create_translation_for(
 }
 
 fn main() -> anyhow::Result<()> {
+    env_logger::init_from_env(env_logger::Env::default().filter_or("RUST_LOG", "info"));
     let cli = Cli::parse();
-    println!("Reconstruct po file from translation of a book");
+    info!("Reconstruct po file from translation of a book");
     let source = Path::new(&cli.source);
     let translation = Path::new(&cli.translation);
     let output = Path::new(&cli.output);
@@ -67,13 +69,9 @@ fn main() -> anyhow::Result<()> {
     let file_map = file_map::auto_folders_match(source, translation)?;
 
     for (source, translation) in &file_map {
-        println!(
-            "Processing {}",
-            source.display(),
-            // translation.display()
-        );
+        info!("Processing {}", source.display());
         if source.file_name() != translation.file_name() {
-            println!("filenames don't match")
+            warn!("filenames don't match")
         } else {
             create_translation_for(source, translation, output, &diff_algorithm)?;
         }

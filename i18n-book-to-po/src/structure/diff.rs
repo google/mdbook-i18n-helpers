@@ -4,7 +4,7 @@ use crate::structure::types::{AlignAction, CmarkEvent, DiffAlgorithm};
 
 /// this diffs the structure in how the original needs to be modified in order to create the translation.
 /// lcs_diff:diff() already does the job, but we transform this to a better understandable datastructure
-fn diff_structure_lcs(source: &Vec<CmarkEvent>, translated: &Vec<CmarkEvent>) -> Vec<AlignAction> {
+fn diff_structure_lcs(source: &[CmarkEvent], translated: &[CmarkEvent]) -> Vec<AlignAction> {
     lcs_diff::diff(translated, source)
         .into_iter()
         .map(|change| {
@@ -23,8 +23,8 @@ fn diff_structure_lcs(source: &Vec<CmarkEvent>, translated: &Vec<CmarkEvent>) ->
 /// this diffs the structure in how the original needs to be modified in order to create the translation.
 /// We use the global alignment algorithm NeedlemanWunsch and transform the result into a understandable datastructure
 fn diff_structure_seal(
-    source: &Vec<CmarkEvent>,
-    translation: &Vec<CmarkEvent>,
+    source: &[CmarkEvent],
+    translation: &[CmarkEvent],
 ) -> Vec<AlignAction> {
     // equal is good, align operation is not good
     let strategy = seal::pair::NeedlemanWunsch::new(1, -1, -1, 0);
@@ -36,7 +36,6 @@ fn diff_structure_seal(
     let global_alignment = set.global_alignment();
     global_alignment
         .steps()
-        .into_iter()
         .map(|step| {
             // x is valid in source and y is valid in target
             match step {
@@ -67,8 +66,8 @@ fn diff_structure_seal(
 
 /// diff the structure of to content-less CmarkEvent streams with the specified algorithm
 pub fn diff_structure(
-    source: &Vec<CmarkEvent>,
-    translated: &Vec<CmarkEvent>,
+    source: &[CmarkEvent],
+    translated: &[CmarkEvent],
     algorithm: &DiffAlgorithm,
 ) -> Vec<AlignAction> {
     match algorithm {
