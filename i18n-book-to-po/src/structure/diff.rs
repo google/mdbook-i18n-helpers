@@ -22,10 +22,7 @@ fn diff_structure_lcs(source: &[CmarkEvent], translated: &[CmarkEvent]) -> Vec<A
 
 /// this diffs the structure in how the original needs to be modified in order to create the translation.
 /// We use the global alignment algorithm NeedlemanWunsch and transform the result into a understandable datastructure
-fn diff_structure_seal(
-    source: &[CmarkEvent],
-    translation: &[CmarkEvent],
-) -> Vec<AlignAction> {
+fn diff_structure_seal(source: &[CmarkEvent], translation: &[CmarkEvent]) -> Vec<AlignAction> {
     // equal is good, align operation is not good
     let strategy = seal::pair::NeedlemanWunsch::new(1, -1, -1, 0);
     let set: seal::pair::AlignmentSet<seal::pair::InMemoryAlignmentMatrix> =
