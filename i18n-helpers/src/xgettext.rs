@@ -41,7 +41,7 @@ fn strip_link(text: &str) -> String {
         })
         .collect::<Vec<_>>();
     let (without_link, _) = reconstruct_markdown(&events, None)
-        .unwrap_or_else(|_| panic!("Couldn't strip link \"{}\"", text));
+        .unwrap_or_else(|_| panic!("Couldn't strip link \"{text}\""));
     without_link
 }
 
