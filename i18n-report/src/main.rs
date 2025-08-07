@@ -123,26 +123,26 @@ fn diff(
         match (old, new) {
             (None, None) => break,
             (Some(old_stats), None) => {
-                println!("Removed {}", old_stats);
+                println!("Removed {old_stats}");
                 old = old_iter.next();
             }
             (None, Some(new_stats)) => {
-                println!("Added {}", new_stats);
+                println!("Added {new_stats}");
                 new = new_iter.next();
             }
             (Some(old_stats), Some(new_stats)) => match old_stats.language.cmp(&new_stats.language)
             {
                 std::cmp::Ordering::Less => {
-                    println!("Removed {}", old_stats);
+                    println!("Removed {old_stats}");
                     old = old_iter.next();
                 }
                 std::cmp::Ordering::Greater => {
-                    println!("Added {}", new_stats);
+                    println!("Added {new_stats}");
                     new = new_iter.next();
                 }
                 std::cmp::Ordering::Equal => {
                     if old_stats != new_stats {
-                        println!("Changed {} -> {}", old_stats, new_stats);
+                        println!("Changed {old_stats} -> {new_stats}");
                     }
                     old = old_iter.next();
                     new = new_iter.next();
