@@ -1,0 +1,88 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"MIME-Version: \n"
+"Content-Type: \n"
+"Content-Transfer-Encoding: \n"
+"Language: \n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: introduction.md:1
+msgid "Chapter 1: Introduction to Markdown"
+msgstr "Kapitel 1: Einführung in Markdown"
+
+#: introduction.md:3
+msgid ""
+"This is the first chapter of our example book. It shows what this tool can "
+"do."
+msgstr ""
+"Dies ist das erste Kapitel unseres Beispielbuchs. Es zeigt, was dieses Tool "
+"kann."
+
+#: introduction.md:5
+msgid "Subchapter"
+msgstr "Unterkapitel"
+
+#: introduction.md:7
+msgid ""
+"All pages of this book are written in Markdown and can contain different "
+"Markdown elements:"
+msgstr ""
+"Alle Seiten dieses Buches sind in Markdown geschrieben und kann verschiedene "
+"Markdown Elemente enthalten:"
+
+#: introduction.md:9
+msgid "Item 1"
+msgstr "Punkt 1"
+
+#: introduction.md:10
+msgid "Item 2"
+msgstr "Punkt 2"
+
+#: introduction.md:11
+msgid "Sub-item 2.1"
+msgstr "Unterpunkt 2.1"
+
+#: introduction.md:12
+msgid "Item 3"
+msgstr "Punkt 3"
+
+#: introduction.md:14
+msgid ""
+"You can also include links like \\[appendix\\]\\[appendix\\] to other "
+"resources easily"
+msgstr ""
+"Sie können auch problemlos Links wie \\[Anhang\\]\\[appendix\\] zu anderen "
+"Ressourcen einfügen."
+
+#: introduction.md:16
+msgid "Code Blocks"
+msgstr "Codeblöcke"
+
+#: introduction.md:18
+msgid "Displaying code is straightforward. Here's an example in Rust:"
+msgstr "Das Anzeigen von Code ist unkompliziert. Hier ist ein Beispiel in Rust:"
+
+#: introduction.md:22
+msgid "\"Hello, {}!\""
+msgstr "\"Hallo, {}!\""
+
+#: introduction.md:26
+msgid "\"World\""
+msgstr "\"Welt\""
+
+#: introduction.md:30
+msgid "Further Examples"
+msgstr "Weitere Beispiele"
+
+#: introduction.md:32
+msgid "You can use **bold text**, _italic text_, or even `inline code blocks`."
+msgstr ""
+"Sie können **fettgedruckten Text**, _kursiven Text_ oder sogar `inline Code "
+"Blöcke` verwenden."
+
