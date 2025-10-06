@@ -16,7 +16,7 @@ to install three binaries:
   [`mdbook` renderer].
 - `mdbook-gettext`: This program translates the book into a target language. It
   is an [`mdbook` preprocessor].
-- `mdbook-i18n-normalize`: This program normalizs a PO file. Use it after
+- `mdbook-i18n-normalize`: This program normalizes a PO file. Use it after
   breaking changes.
 
 [`mdbook` renderer]: https://rust-lang.github.io/mdBook/format/configuration/renderers.html
