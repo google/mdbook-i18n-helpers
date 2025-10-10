@@ -140,7 +140,25 @@ where
             })?,
     };
 
-    // First, add all chapter names and part titles from SUMMARY.md.
+    // Include book level metadata from book.toml so translators can localize
+    // what readers see in the book chrome.
+    let book_toml_path = Path::new("book.toml");
+    if let Some(title) = ctx.config.book.title.as_ref().filter(|t| !t.trim().is_empty()) {
+        let source = build_source(book_toml_path, 1, granularity);
+        add_message(&mut catalog, title, &source, "Book title");
+    }
+    if let Some(description) = ctx
+        .config
+        .book
+        .description
+        .as_ref()
+        .filter(|d| !d.trim().is_empty())
+    {
+        let source = build_source(book_toml_path, 1, granularity);
+        add_message(&mut catalog, description, &source, "Book description");
+    }
+
+    // Next, add all chapter names and part titles from SUMMARY.md.
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
     let summary = summary_reader(ctx.root.join(&summary_path))
         .with_context(|| anyhow!("Failed to read {}", summary_path.display()))?;
@@ -382,6 +400,7 @@ mod tests {
                 "book.toml",
                 "[book]\n\
                  title = \"My Translatable Book\"\n\
+                 description = \"A lovely book\"\n\
                  language = \"fr\"",
             ),
             ("src/SUMMARY.md", ""),
@@ -393,6 +412,16 @@ mod tests {
         let catalog = &catalogs[&default_template_file()];
         assert_eq!(catalog.metadata.project_id_version, "My Translatable Book");
         assert_eq!(catalog.metadata.language, "fr");
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid(), msg.comments()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("book.toml:1", "My Translatable Book", "Book title"),
+                ("book.toml:1", "A lovely book", "Book description"),
+            ]
+        );
         Ok(())
     }
 

@@ -179,6 +179,12 @@ MDBOOK_BOOK__LANGUAGE=xx mdbook build -d book/xx
 This will set the book's language to `xx` and store the generated files in
 `book/xx`.
 
+> **Note:** `mdbook-xgettext` also extracts the values of `book.title` and
+> `book.description` from `book.toml`. After translating them, you can override
+> the metadata per locale by setting `MDBOOK_BOOK__TITLE` and
+> `MDBOOK_BOOK__DESCRIPTION` (or editing your localized `book.toml`) when
+> running `mdbook build`.
+
 ### Serving a Translated Book
 
 Like normal, you can use `mdbook serve` to view your translation as you work on
