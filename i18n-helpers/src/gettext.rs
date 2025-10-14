@@ -40,7 +40,7 @@ fn strip_formatting(text: &str) -> String {
         .collect()
 }
 
-fn translate(text: &str, catalog: &Catalog) -> anyhow::Result<String> {
+pub(crate) fn translate(text: &str, catalog: &Catalog) -> anyhow::Result<String> {
     let events = extract_events(text, None);
     // Translation should always succeed.
     let translated_events = translate_events(&events, catalog).expect("Failed to translate events");
