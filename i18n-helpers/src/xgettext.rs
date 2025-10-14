@@ -143,9 +143,15 @@ where
     // Include book level metadata from book.toml so translators can localize
     // what readers see in the book chrome.
     let book_toml_path = Path::new("book.toml");
-    if let Some(title) = ctx.config.book.title.as_ref().filter(|t| !t.trim().is_empty()) {
+    if let Some(title) = ctx
+        .config
+        .book
+        .title
+        .as_ref()
+        .filter(|t| !t.trim().is_empty())
+    {
         let source = build_source(book_toml_path, 1, granularity);
-        add_message(&mut catalog, title, &source, "Book title");
+        add_message(&mut catalog, title, &source, "");
     }
     if let Some(description) = ctx
         .config
@@ -155,7 +161,7 @@ where
         .filter(|d| !d.trim().is_empty())
     {
         let source = build_source(book_toml_path, 1, granularity);
-        add_message(&mut catalog, description, &source, "Book description");
+        add_message(&mut catalog, description, &source, "");
     }
 
     // Next, add all chapter names and part titles from SUMMARY.md.
@@ -418,8 +424,8 @@ mod tests {
                 .map(|msg| (msg.source(), msg.msgid(), msg.comments()))
                 .collect::<Vec<_>>(),
             vec![
-                ("book.toml:1", "My Translatable Book", "Book title"),
-                ("book.toml:1", "A lovely book", "Book description"),
+                ("book.toml:1", "My Translatable Book", ""),
+                ("book.toml:1", "A lovely book", ""),
             ]
         );
         Ok(())
