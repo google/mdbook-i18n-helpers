@@ -1,5 +1,5 @@
 use arbitrary::Arbitrary;
-use mdbook::book::{Book, Chapter};
+use mdbook_preprocessor::book::{Book, Chapter};
 use polib::catalog::Catalog;
 use polib::message::Message;
 use polib::metadata::CatalogMetadata;
@@ -36,17 +36,14 @@ pub enum BookItem {
     PartTitle(String),
 }
 
-impl From<BookItem> for mdbook::book::BookItem {
-    fn from(other: BookItem) -> mdbook::book::BookItem {
+impl From<BookItem> for mdbook_preprocessor::book::BookItem {
+    fn from(other: BookItem) -> mdbook_preprocessor::book::BookItem {
         match other {
-            BookItem::Chapter { name, content } => mdbook::book::BookItem::Chapter(Chapter::new(
-                &name,
-                content,
-                PathBuf::new(),
-                Vec::new(),
-            )),
-            BookItem::Separator => mdbook::book::BookItem::Separator,
-            BookItem::PartTitle(title) => mdbook::book::BookItem::PartTitle(title),
+            BookItem::Chapter { name, content } => mdbook_preprocessor::book::BookItem::Chapter(
+                Chapter::new(&name, content, PathBuf::new(), Vec::new()),
+            ),
+            BookItem::Separator => mdbook_preprocessor::book::BookItem::Separator,
+            BookItem::PartTitle(title) => mdbook_preprocessor::book::BookItem::PartTitle(title),
         }
     }
 }

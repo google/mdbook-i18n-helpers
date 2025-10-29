@@ -4,10 +4,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use libfuzzer_sys::fuzz_target;
-use mdbook::renderer::RenderContext;
-use mdbook::Config;
 use mdbook_i18n_helpers::xgettext::create_catalogs;
 use mdbook_i18n_helpers_fuzz::{create_book, BookItem};
+use mdbook_renderer::config::Config;
+use mdbook_renderer::RenderContext;
 
 fuzz_target!(|inputs: (&str, Vec<BookItem>)| {
     let (summary, book_items) = inputs;

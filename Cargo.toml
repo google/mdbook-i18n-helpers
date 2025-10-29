@@ -10,7 +10,9 @@ print_stderr = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-mdbook = { version = "0.4.52", default-features = false }
+mdbook-driver = "0.5.0"
+mdbook-preprocessor = "0.5.0"
+mdbook-renderer = "0.5.0"
 polib = "0.2.0"
 pretty_assertions = "1.4.1"
 serde_json = "1.0.145"

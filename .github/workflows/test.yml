@@ -47,7 +47,7 @@ jobs:
           - repo: rust-lang/book
             ref: 71352deb20727b4dda9ebfe8182709d5bf17dfea
           - repo: google/comprehensive-rust
-            ref: 981676d811927f1b50b7654ceb4cc3c10d7fe97b
+            ref: 1b91548093ee91b4d4f63ed97419c07243923df9
 
     name: Test with ${{ matrix.repo }}
     runs-on: ubuntu-latest
@@ -64,7 +64,7 @@ jobs:
           sudo apt install gettext
           # Debug builds are fine and slightly faster.
           cargo install --debug --path i18n-helpers
-          cargo install --debug --locked --version 0.4.35 mdbook
+          cargo install --debug --locked --version 0.5.0 mdbook
 
       - name: Checkout ${{ matrix.repo }}
         uses: actions/checkout@v5
@@ -76,7 +76,9 @@ jobs:
       - name: Test extracting text
         working-directory: example-book
         run: |
-          MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' mdbook build -d po
+          MDBOOK_PREPROCESSOR__COURSE__OPTIONAL=true \
+            MDBOOK_OUTPUT='{"xgettext": {"pot-file": "messages.pot"}}' \
+            mdbook build -d po
           msgfmt -o /dev/null --statistics po/messages.pot
 
   fuzz:

@@ -1,6 +1,6 @@
 use crate::xgettext::create_catalogs;
 use anyhow::Context;
-use mdbook::renderer::{RenderContext, Renderer};
+use mdbook_renderer::{RenderContext, Renderer};
 use std::fs;
 
 /// Renderer for xgettext

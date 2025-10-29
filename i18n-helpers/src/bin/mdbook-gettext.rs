@@ -24,22 +24,22 @@
 //! PO files. If the PO file is not found, you'll get the untranslated
 //! book.
 
-use mdbook::preprocess::{CmdPreprocessor, Preprocessor};
 use mdbook_i18n_helpers::preprocessors::Gettext;
+use mdbook_preprocessor::Preprocessor;
 use semver::{Version, VersionReq};
 use std::{io, process};
 
 /// Execute main logic by this mdbook preprocessor.
 fn preprocess() -> anyhow::Result<()> {
-    let (ctx, book) = CmdPreprocessor::parse_input(io::stdin())?;
+    let (ctx, book) = mdbook_preprocessor::parse_input(io::stdin())?;
     let book_version = Version::parse(&ctx.mdbook_version)?;
-    let version_req = VersionReq::parse(mdbook::MDBOOK_VERSION)?;
+    let version_req = VersionReq::parse(mdbook_preprocessor::MDBOOK_VERSION)?;
     #[allow(clippy::print_stderr)]
     if !version_req.matches(&book_version) {
         eprintln!(
             "Warning: The gettext preprocessor was built against \
              mdbook version {}, but we're being called from version {}",
-            mdbook::MDBOOK_VERSION,
+            mdbook_preprocessor::MDBOOK_VERSION,
             ctx.mdbook_version
         );
     }
@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()> {
         assert_eq!(std::env::args().nth(1).as_deref(), Some("supports"));
         if let Some(renderer) = std::env::args().nth(2).as_deref() {
             let gettext = Gettext;
-            if gettext.supports_renderer(renderer) {
+            if gettext.supports_renderer(renderer).unwrap() {
                 process::exit(0)
             } else {
                 process::exit(1)
