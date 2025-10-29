@@ -13,7 +13,7 @@ workspace = true
 [dependencies]
 arbitrary = { version = "1.4.2", features = ["derive"] }
 libfuzzer-sys = "0.4.10"
-mdbook.workspace = true
+mdbook-preprocessor.workspace = true
 mdbook-i18n-helpers = { path = "../i18n-helpers" }
 polib.workspace = true
 pretty_assertions.workspace = true

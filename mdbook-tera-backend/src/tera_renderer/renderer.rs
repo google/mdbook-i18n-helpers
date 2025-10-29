@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use mdbook::renderer::RenderContext;
+use mdbook_renderer::RenderContext;
 use std::path::Path;
 use tera::Tera;
 
@@ -87,7 +87,7 @@ mod test {
     use super::*;
     use crate::tera_renderer::custom_component::TeraRendererConfig;
     use anyhow::Context;
-    use mdbook::MDBook;
+    use mdbook_driver::MDBook;
 
     fn create_render_context(
         files: &[(&str, &str)],
@@ -139,7 +139,7 @@ mod test {
 
         let config: TeraRendererConfig = ctx
             .config
-            .get_deserialized_opt("output.tera-backend")?
+            .get("output.tera-backend")?
             .ok_or_else(|| anyhow!("No tera backend configuration."))?;
 
         let tera_template = config.create_template(&ctx.root)?;
