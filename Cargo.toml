@@ -10,8 +10,15 @@ print_stderr = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-mdbook = { version = "0.4.52", default-features = false }
+mdbook-driver = "0.5.0-beta.1"
+mdbook-preprocessor = "0.5.0-beta.1"
+mdbook-renderer = "0.5.0-beta.1"
 polib = "0.2.0"
 pretty_assertions = "1.4.1"
 serde_json = "1.0.145"
 tempfile = "3.23.0"
+
+[patch.crates-io]
+mdbook-driver.path = "/Users/eric/Proj/rust/mdBook/crates/mdbook-driver"
+mdbook-preprocessor.path = "/Users/eric/Proj/rust/mdBook/crates/mdbook-preprocessor"
+mdbook-renderer.path = "/Users/eric/Proj/rust/mdBook/crates/mdbook-renderer"

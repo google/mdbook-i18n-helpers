@@ -16,8 +16,7 @@
 
 use super::{extract_events, reconstruct_markdown, translate_events};
 use anyhow::Context;
-use mdbook::book::Book;
-use mdbook::BookItem;
+use mdbook_preprocessor::book::{Book, BookItem};
 use polib::catalog::Catalog;
 use polib::message::Message;
 use pulldown_cmark::Event;
