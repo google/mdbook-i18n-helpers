@@ -20,7 +20,7 @@ mdbook.workspace = true
 polib.workspace = true
 pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html"] }
 pulldown-cmark-to-cmark = "21.0.0"
-regex = "1.11"
+regex = "1.12"
 semver = "1.0.27"
 serde_json.workspace = true
 syntect = { version = "5.3.0", default-features = false, features = ["parsing", "default-syntaxes", "regex-fancy"] }
