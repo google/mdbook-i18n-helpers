@@ -22,8 +22,8 @@ use std::path::{Path, PathBuf};
 
 use super::{extract_events, extract_messages, reconstruct_markdown, wrap_sources};
 use anyhow::{anyhow, Context};
-use mdbook::renderer::RenderContext;
-use mdbook::{book, BookItem};
+use mdbook_renderer::RenderContext;
+use mdbook_renderer::{book, book::BookItem};
 use paths::UniquePathBuilder;
 use polib::catalog::Catalog;
 use polib::message::{Message, MessageMutView, MessageView};
@@ -126,19 +126,10 @@ where
 
     // The line number granularity: we default to 1, but it can be
     // overridden as needed.
-    let granularity = match ctx
+    let granularity = ctx
         .config
-        .get_renderer("xgettext")
-        .and_then(|cfg| cfg.get("granularity"))
-    {
-        None => 1,
-        Some(value) => value
-            .as_integer()
-            .and_then(|i| (i >= 0).then_some(i as usize))
-            .ok_or_else(|| {
-                anyhow!("Expected an unsigned integer for output.xgettext.granularity")
-            })?,
-    };
+        .get::<usize>("output.xgettext.granularity")?
+        .unwrap_or(1);
 
     // First, add all chapter names and part titles from SUMMARY.md.
     let summary_path = ctx.config.book.src.join("SUMMARY.md");
@@ -166,17 +157,10 @@ where
     // include all messages into a single POT file (depth == 0).
     // Greater values will split POT files, digging into the
     // sub-chapters within each chapter.
-    let depth = match ctx
+    let depth = ctx
         .config
-        .get_renderer("xgettext")
-        .and_then(|cfg| cfg.get("depth"))
-    {
-        None => 0,
-        Some(value) => value
-            .as_integer()
-            .and_then(|i| (i >= 0).then_some(i as usize))
-            .ok_or_else(|| anyhow!("Expected an unsigned integer for output.xgettext.depth"))?,
-    };
+        .get::<usize>("output.xgettext.depth")?
+        .unwrap_or(0);
 
     // The catalog from the summary data will exist in the single pot
     // file for a depth of 0, will exist in a top-level separate
@@ -190,7 +174,7 @@ where
     unique_path_builder.pop();
 
     // Next, we add the part-title and chapter contents.
-    for item in &ctx.book.sections {
+    for item in &ctx.book.items {
         if let BookItem::PartTitle(title) = item {
             // Iterating through the book in section-order, the
             // `PartTitle` represents the 'section' that each chapter
@@ -277,7 +261,7 @@ fn get_subcontent_for_chapter(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mdbook::MDBook;
+    use mdbook_driver::MDBook;
     use pretty_assertions::assert_eq;
 
     fn create_render_context(

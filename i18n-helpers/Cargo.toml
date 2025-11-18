@@ -1,6 +1,6 @@
 [package]
 name = "mdbook-i18n-helpers"
-version = "0.3.6"
+version = "0.4.0"
 authors = ["Martin Geisler <mgeisler@google.com>"]
 categories = ["command-line-utilities", "localization"]
 edition = "2021"
@@ -16,7 +16,8 @@ workspace = true
 anyhow.workspace = true
 chrono = { version = "0.4.42", default-features = false, features = ["alloc"] }
 dateparser = "0.2.1"
-mdbook.workspace = true
+mdbook-preprocessor.workspace = true
+mdbook-renderer.workspace = true
 polib.workspace = true
 pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html"] }
 pulldown-cmark-to-cmark = "21.0.0"
@@ -27,5 +28,6 @@ syntect = { version = "5.3.0", default-features = false, features = ["parsing", 
 textwrap = { version = "0.16.2", default-features = false }
 
 [dev-dependencies]
+mdbook-driver.workspace = true
 pretty_assertions.workspace = true
 tempfile.workspace = true

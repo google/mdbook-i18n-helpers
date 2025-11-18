@@ -1,7 +1,7 @@
 mod tera_renderer;
 
 use anyhow::{anyhow, Context};
-use mdbook::renderer::RenderContext;
+use mdbook_renderer::RenderContext;
 use std::io;
 
 use crate::tera_renderer::custom_component::TeraRendererConfig;
@@ -12,14 +12,14 @@ use crate::tera_renderer::renderer::Renderer;
 fn main() -> anyhow::Result<()> {
     let mut stdin = io::stdin();
     let ctx = RenderContext::from_json(&mut stdin).unwrap();
-    if ctx.config.get_renderer("html").is_none() {
+    if !ctx.config.contains_key("output.html") {
         return Err(anyhow!(
             "Could not find the HTML backend. Please make sure the HTML backend is enabled."
         ));
     }
     let config: TeraRendererConfig = ctx
         .config
-        .get_deserialized_opt("output.tera-backend")
+        .get("output.tera-backend")
         .context("Failed to get tera-backend config")?
         .context("No tera-backend config found")?;
 

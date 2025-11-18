@@ -14,7 +14,7 @@
 
 use crate::gettext::{add_stripped_summary_translations, translate_book};
 use anyhow::{anyhow, Context};
-use mdbook::preprocess::{Preprocessor, PreprocessorContext};
+use mdbook_preprocessor::{Preprocessor, PreprocessorContext};
 use polib::catalog::Catalog;
 use polib::po_file;
 use std::path::PathBuf;
@@ -45,11 +45,10 @@ fn get_catalog_path(ctx: &PreprocessorContext) -> anyhow::Result<PathBuf> {
         .as_ref()
         .ok_or_else(|| anyhow!("Language is not provided"))?;
 
-    let cfg = ctx
+    let po_dir: String = ctx
         .config
-        .get_preprocessor("gettext")
-        .ok_or_else(|| anyhow!("Could not read preprocessor.gettext configuration"))?;
-    let po_dir = cfg.get("po-dir").and_then(|v| v.as_str()).unwrap_or("po");
+        .get("preprocessor.gettext.po-dir")?
+        .unwrap_or_else(|| "po".to_string());
     Ok(ctx.root.join(po_dir).join(format!("{language}.po")))
 }
 
@@ -75,8 +74,8 @@ impl Preprocessor for Gettext {
     fn run(
         &self,
         ctx: &PreprocessorContext,
-        mut book: mdbook::book::Book,
-    ) -> anyhow::Result<mdbook::book::Book> {
+        mut book: mdbook_preprocessor::book::Book,
+    ) -> anyhow::Result<mdbook_preprocessor::book::Book> {
         if should_translate(ctx) {
             let mut catalog = load_catalog(ctx)?;
             add_stripped_summary_translations(&mut catalog);
@@ -85,7 +84,7 @@ impl Preprocessor for Gettext {
         Ok(book)
     }
 
-    fn supports_renderer(&self, renderer: &str) -> bool {
-        renderer != "xgettext"
+    fn supports_renderer(&self, renderer: &str) -> mdbook_preprocessor::errors::Result<bool> {
+        Ok(renderer != "xgettext")
     }
 }

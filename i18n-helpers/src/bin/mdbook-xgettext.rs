@@ -22,8 +22,8 @@
 //! of Chapter nesting.
 
 use anyhow::Context;
-use mdbook::renderer::{RenderContext, Renderer};
 use mdbook_i18n_helpers::renderers::Xgettext;
+use mdbook_renderer::{RenderContext, Renderer};
 use std::io;
 
 fn main() -> anyhow::Result<()> {
