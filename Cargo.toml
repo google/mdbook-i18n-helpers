@@ -10,7 +10,7 @@ print_stderr = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-mdbook-driver = "0.5.0"
+mdbook-driver = "0.5.1"
 mdbook-preprocessor = "0.5.1"
 mdbook-renderer = "0.5.1"
 polib = "0.2.0"
