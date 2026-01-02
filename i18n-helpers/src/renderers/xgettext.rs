@@ -24,7 +24,7 @@ impl Renderer for Xgettext {
             fs::create_dir_all(directory_path)
                 .with_context(|| format!("Could not create {}", directory_path.display()))?;
 
-            polib::po_file::write(&catalog, &dst_path)
+            polib::po_file::write_to_file(&catalog, &dst_path)
                 .with_context(|| format!("Writing messages to {}", dst_path.display()))?;
         }
 

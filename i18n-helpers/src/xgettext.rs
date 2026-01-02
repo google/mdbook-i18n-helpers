@@ -53,7 +53,7 @@ fn add_message(catalog: &mut Catalog, msgid: &str, source: &str, comment: &str) 
     let message = Message::build_singular()
         .with_source(sources)
         .with_msgid(String::from(msgid))
-        .with_comments(String::from(comment))
+        .with_extracted_comments(String::from(comment))
         .done();
     catalog.append_or_update(message);
 }
