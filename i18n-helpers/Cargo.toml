@@ -14,7 +14,7 @@ workspace = true
 
 [dependencies]
 anyhow.workspace = true
-chrono = { version = "0.4.42", default-features = false, features = ["alloc"] }
+chrono = { version = "0.4.43", default-features = false, features = ["alloc"] }
 dateparser = "0.2.1"
 mdbook-preprocessor.workspace = true
 mdbook-renderer.workspace = true
