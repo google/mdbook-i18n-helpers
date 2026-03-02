@@ -9,7 +9,7 @@ print_stdout = "warn"
 print_stderr = "warn"
 
 [workspace.dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 mdbook-driver = "0.5.2"
 mdbook-preprocessor = "0.5.2"
 mdbook-renderer = "0.5.2"
