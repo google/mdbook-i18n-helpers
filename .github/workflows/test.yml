@@ -35,7 +35,7 @@ jobs:
         run: cargo llvm-cov test --all-features --workspace --codecov --locked --output-path codecov_report.json
 
       - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: ./codecov_report.json
 
