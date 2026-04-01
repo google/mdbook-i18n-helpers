@@ -19,7 +19,7 @@ dateparser = "0.2.1"
 mdbook-preprocessor.workspace = true
 mdbook-renderer.workspace = true
 polib.workspace = true
-pulldown-cmark = { version = "0.13.1", default-features = false, features = ["html"] }
+pulldown-cmark = { version = "0.13.3", default-features = false, features = ["html"] }
 pulldown-cmark-to-cmark = "22.0.0"
 regex = "1.12"
 semver = "1.0.27"
