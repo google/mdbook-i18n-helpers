@@ -499,13 +499,20 @@ mod tests {
             \n\
             </div>",
         )]);
-        assert_normalized_messages_eq(catalog, &[exact("foo", "FOO")]);
+        assert_normalized_messages_eq(
+            catalog,
+            &[
+                exact("<div class=\"warning\">\n", "<div class=\"warning\">\n"),
+                exact("foo", "FOO"),
+                exact("</div>", "</div>"),
+            ],
+        );
     }
 
     #[test]
-    fn test_normalize_disappearing_html() {
-        // Normalizing "<b>" results in no messages.
-        let catalog = create_catalog(&[("<b>", "FOO")]);
+    fn test_normalize_disappearing_message() {
+        // Normalizing " " results in no messages.
+        let catalog = create_catalog(&[(" ", "FOO")]);
         assert_normalized_messages_eq(catalog, &[]);
     }
 
