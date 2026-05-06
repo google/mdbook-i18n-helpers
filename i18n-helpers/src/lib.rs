@@ -395,20 +395,9 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Result<Vec<Group<'a
                     }
                     _ => {
                         match event {
-                            Event::Html(_) => {
-                                // Otherwise, treat as a skipping group if this is a block level Html tag
-                                if let State::Translate(_) = state {
-                                    let mut next_groups;
-                                    (next_groups, ctx) = state.into_groups(idx, events, ctx)?;
-                                    groups.append(&mut next_groups);
-
-                                    state = State::Skip(idx);
-                                }
-                            }
-                            Event::InlineHtml(_) =>
-                            // If we're currently skipping, then a new
-                            // translatable group starts here.
-                            {
+                            Event::Html(_) | Event::InlineHtml(_) => {
+                                // If we're currently skipping, then a new
+                                // translatable group starts here.
                                 if let State::Skip(_) = state {
                                     let mut next_groups;
                                     (next_groups, ctx) = state.into_groups(idx, events, ctx)?;
@@ -1088,9 +1077,9 @@ mod tests {
     }
 
     #[test]
-    fn extract_messages_ignore_whitespace_only_block_html() {
-        // Whitespace in block level html tags is ignored
-        assert_extract_messages("<p>  </p>", &[]);
+    fn extract_messages_keep_whitespace_only_block_html() {
+        // p is a block level html tag so even whitespace is kept as is
+        assert_extract_messages("<p>  </p>", &[(1, "<p>  </p>")]);
     }
 
     #[test]
@@ -1164,7 +1153,11 @@ mod tests {
             Beware of the dog!\n\
             \n\
             </div>",
-            &[(3, "Beware of the dog!")],
+            &[
+                (1, "<div class=\"warning\">\n"),
+                (3, "Beware of the dog!"),
+                (5, "</div>"),
+            ],
         );
     }
 
@@ -1177,7 +1170,11 @@ mod tests {
             Hi from <span dir=\"ltr\">Rust</span>\n\
             \n\
             </div>",
-            &[(3, "Hi from <span dir=\"ltr\">Rust</span>")],
+            &[
+                (1, "<div>\n"),
+                (3, "Hi from <span dir=\"ltr\">Rust</span>"),
+                (5, "</div>"),
+            ],
         );
     }
 
@@ -1429,7 +1426,7 @@ HTML -->
 
     #[test]
     fn extract_messages_details() {
-        // This isn't great: we lose text following a HTML tag:
+        // We used to lose text following a HTML tag, but it works now:
         assert_extract_messages(
             "Preamble\n\
              <details>\n\
@@ -1439,11 +1436,11 @@ HTML -->
              Postamble",
             &[
                 (1, "Preamble"), //
-                // Missing "Some Details"
+                (2, "<details>\nSome Details\n</details>\n"),
                 (6, "Postamble"),
             ],
         );
-        // It works well enough when `<details>` has blank lines
+        // It also works well enough when `<details>` has blank lines
         // before and after.
         assert_extract_messages(
             "Preamble\n\
@@ -1457,7 +1454,9 @@ HTML -->
              Postamble",
             &[
                 (1, "Preamble"), //
+                (3, "<details>\n"),
                 (5, "Some Details"),
+                (7, "</details>\n"),
                 (9, "Postamble"),
             ],
         );
@@ -1548,7 +1547,9 @@ HTML -->
 ",
             &[
                 (1, "```bob\n// BOB\n```"), //
+                (5, "<details>\n"),
                 (7, "Blah blah"),
+                (9, "</details>\n"),
             ],
         );
     }
