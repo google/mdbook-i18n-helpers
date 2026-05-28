@@ -416,6 +416,24 @@ mod tests {
     }
 
     #[test]
+    fn test_translate_gfm_alert() {
+        let catalog = create_catalog(&[("Hello world.", "สวัสดีชาวโลก")]);
+        assert_eq!(
+            translate("> [!NOTE]\n> Hello world.", &catalog).unwrap(),
+            " > [!NOTE]\n > สวัสดีชาวโลก",
+        );
+    }
+
+    #[test]
+    fn test_translate_gfm_alert_no_translation() {
+        let catalog = create_catalog(&[]);
+        assert_eq!(
+            translate("> [!WARNING]\n\nBe careful!", &catalog).unwrap(),
+            " > [!WARNING]\n\nBe careful!",
+        );
+    }
+
+    #[test]
     fn test_translate_inline_html() {
         let catalog = create_catalog(&[("foo <b>bar</b> baz", "FOO <b>BAR</b> BAZ")]);
         assert_eq!(

@@ -25,7 +25,8 @@
 
 use polib::catalog::Catalog;
 use pulldown_cmark::{
-    BrokenLinkCallback, CodeBlockKind, DefaultBrokenLinkCallback, Event, LinkType, Tag, TagEnd,
+    BlockQuoteKind, BrokenLinkCallback, CodeBlockKind, DefaultBrokenLinkCallback, Event, LinkType,
+    Tag, TagEnd,
 };
 use pulldown_cmark_to_cmark::{calculate_code_block_token_count, cmark_resume_with_options};
 use pulldown_cmark_to_cmark::{Error as CmarkError, Options, State};
@@ -59,6 +60,7 @@ pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
 ) -> pulldown_cmark::Parser<'input, F> {
     let mut options = pulldown_cmark::Options::empty();
     options.insert(pulldown_cmark::Options::ENABLE_TABLES);
+    options.insert(pulldown_cmark::Options::ENABLE_GFM);
     options.insert(pulldown_cmark::Options::ENABLE_OLD_FOOTNOTES);
     options.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
     options.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
@@ -320,6 +322,13 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Result<Vec<Group<'a
 
                 state = State::Translate(idx);
             }
+            Event::Start(Tag::BlockQuote(Some(_))) => {
+                // GFM alert marker: treat as a skip element like CodeBlock.
+                let mut next_groups;
+                (next_groups, ctx) = state.into_groups(idx, events, ctx)?;
+                groups.append(&mut next_groups);
+                state = State::Skip(idx);
+            }
             Event::End(TagEnd::Paragraph | TagEnd::CodeBlock) => {
                 // A translatable group ends after `idx`.
                 let idx = idx + 1;
@@ -330,6 +339,12 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Result<Vec<Group<'a
                 state = State::Skip(idx);
             }
 
+            Event::End(TagEnd::BlockQuote(Some(_))) => {
+                // GFM alert end: body text starts naturally after this.
+            }
+            Event::Start(Tag::Heading { .. }) => {
+                // Heading structural events fall through to the skip arm.
+            }
             // Inline events start or continue a translating group.
             Event::Start(
                 Tag::Emphasis
@@ -875,6 +890,7 @@ pub fn translate_events<'a>(
 ) -> Result<Vec<(usize, Event<'a>)>, CmarkError> {
     let mut translated_events = Vec::new();
     let mut state = None;
+    let mut pending_alert_kind: Option<BlockQuoteKind> = None;
 
     for group in group_events(events)? {
         match group {
@@ -885,23 +901,44 @@ pub fn translate_events<'a>(
                     .find_message(None, &msgid, None)
                     .filter(|msg| !msg.flags().is_fuzzy() && msg.is_translated())
                     .and_then(|msg| msg.msgstr().ok());
+                let gfm_kind = pending_alert_kind.take();
+
                 match translated {
                     Some(msgstr) => {
-                        // Generate new events for `msgstr`, taking
-                        // care to trim away unwanted paragraphs.
-                        translated_events.extend_from_slice(trim_paragraph(
-                            &extract_events(msgstr, state),
-                            &events,
-                        ));
+                        let trimmed =
+                            trim_paragraph(&extract_events(msgstr, state.clone()), &events)
+                                .to_vec();
+                        if let Some(kind) = gfm_kind {
+                            // Wrap body inside blockquote to preserve indentation.
+                            let mut wrapped = vec![(0, Event::Start(Tag::BlockQuote(Some(kind))))];
+                            wrapped.extend(trimmed);
+                            wrapped.push((0, Event::End(TagEnd::BlockQuote(Some(kind)))));
+                            translated_events.extend_from_slice(&wrapped);
+                        } else {
+                            translated_events.extend_from_slice(&trimmed);
+                        }
                     }
-                    None => translated_events.extend_from_slice(&events),
+                    None => {
+                        // Emit GFM alert marker, then output body as-is (no wrapping).
+                        if let Some(kind) = gfm_kind {
+                            translated_events.extend_from_slice(&[
+                                (0, Event::Start(Tag::BlockQuote(Some(kind)))),
+                                (0, Event::End(TagEnd::BlockQuote(Some(kind)))),
+                            ]);
+                        }
+                        translated_events.extend_from_slice(&events);
+                    }
                 }
                 // Advance the state.
                 state = Some(new_state);
             }
             Group::Skip(events) => {
-                // Copy the events unchanged to the output.
-                translated_events.extend_from_slice(&events);
+                // For GFM alert, defer to Translate arm to avoid duplicate output.
+                if let Some((_, Event::Start(Tag::BlockQuote(Some(kind))))) = events.first() {
+                    pending_alert_kind = Some(*kind);
+                } else {
+                    translated_events.extend_from_slice(&events);
+                }
                 // Advance the state.
                 let (_, new_state) = reconstruct_markdown(&events, state)?;
                 state = Some(new_state);
@@ -1920,6 +1957,35 @@ My Message
 My Message
 "#,
             &[(1, "```admonish tip\nMy Message\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_gfm_alert_note() {
+        assert_extract_messages("> [!NOTE]\n\nHello.", &[(3, "Hello.")]);
+    }
+
+    #[test]
+    fn extract_messages_gfm_alert_multi_line_body() {
+        assert_extract_messages(
+            "> [!WARNING]\n\nLine one.\nLine two.",
+            &[(3, "Line one. Line two.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_gfm_alert_with_emphasis() {
+        assert_extract_messages(
+            "> [!IMPORTANT]\n\nThis is **important**.",
+            &[(3, "This is **important**.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_gfm_alert_multi_paragraph() {
+        assert_extract_messages(
+            "> [!NOTE]\n\nFirst paragraph.\n\nSecond paragraph.",
+            &[(3, "First paragraph."), (5, "Second paragraph.")],
         );
     }
 
