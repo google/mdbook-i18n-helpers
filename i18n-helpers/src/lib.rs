@@ -63,6 +63,7 @@ pub fn new_cmark_parser<'input, F: BrokenLinkCallback<'input>>(
     options.insert(pulldown_cmark::Options::ENABLE_STRIKETHROUGH);
     options.insert(pulldown_cmark::Options::ENABLE_TASKLISTS);
     options.insert(pulldown_cmark::Options::ENABLE_HEADING_ATTRIBUTES);
+    options.insert(pulldown_cmark::Options::ENABLE_DEFINITION_LIST);
     pulldown_cmark::Parser::new_with_broken_link_callback(text, options, broken_link_callback)
 }
 
@@ -1950,5 +1951,58 @@ some_syntax = do_something();
 ```"#,
             &[],
         );
+    }
+
+    #[test]
+    fn extract_messages_definition_list() {
+        assert_extract_messages(
+            "Term 1\n\n: Definition 1\n\nTerm 2\n\n: Definition 2a\n: Definition 2b\n",
+            &[
+                (1, "Term 1"),
+                (3, "Definition 1"),
+                (5, "Term 2"),
+                (7, "Definition 2a"),
+                (8, "Definition 2b"),
+            ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_definition_list_with_formatting() {
+        assert_extract_messages(
+            "**Bold term**\n\n: A *definition* with `code`.\n\n[Link term](http://example.com)\n\n: A [link def](http://example.org).\n",
+            &[
+                (1, "**Bold term**"),
+                (3, "A _definition_ with `code`."),
+                (5, "[Link term](http://example.com)"),
+                (7, "A [link def](http://example.org)."),
+            ],
+        );
+    }
+
+    #[test]
+    fn translate_events_definition_list() {
+        use polib::catalog::Catalog;
+        use polib::message::Message;
+        use polib::metadata::CatalogMetadata;
+
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        let msg = Message::build_singular()
+            .with_msgid("Term 1".into())
+            .with_msgstr("คำศัพท์ 1".into())
+            .done();
+        catalog.append_or_update(msg);
+
+        let msg = Message::build_singular()
+            .with_msgid("Definition 1".into())
+            .with_msgstr("นิยาม 1".into())
+            .done();
+        catalog.append_or_update(msg);
+
+        let events = extract_events("Term 1\n\n: Definition 1\n", None);
+        let translated = translate_events(&events, &catalog).unwrap();
+        let (reconstructed, _) = reconstruct_markdown(&translated, None).unwrap();
+
+        assert_eq!(reconstructed, "คำศัพท์ 1\n: นิยาม 1\n");
     }
 }
