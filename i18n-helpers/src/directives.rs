@@ -4,6 +4,8 @@ use std::sync::OnceLock;
 #[derive(Debug, PartialEq)]
 pub enum Directive {
     Skip,
+    SkipStart,
+    SkipEnd,
     Comment(String),
 }
 
@@ -23,9 +25,12 @@ pub fn find(html: &str) -> Option<Directive> {
     let captures = re.captures(html.trim())?;
 
     let command = captures["command"].trim();
-    match command.split(is_delimiter).next() {
-        Some("skip") => Some(Directive::Skip),
-        Some("comment") => {
+    let mut tokens = command.split(is_delimiter).filter(|s| !s.is_empty());
+    match (tokens.next(), tokens.next()) {
+        (Some("skip"), None) => Some(Directive::Skip),
+        (Some("skip"), Some("start")) => Some(Directive::SkipStart),
+        (Some("skip"), Some("end")) => Some(Directive::SkipEnd),
+        (Some("comment"), _) => {
             let start_of_comment_offset = std::cmp::min(
                 command.find("comment").unwrap() + "comment".len() + 1,
                 command.len(),
@@ -79,6 +84,70 @@ mod tests {
         assert!(matches!(
             find("<!-- mdbook-xgettext:skip -->"),
             Some(Directive::Skip)
+        ));
+    }
+
+    #[test]
+    fn test_skip_start_simple() {
+        assert!(matches!(
+            find("<!-- i18n:skip-start -->"),
+            Some(Directive::SkipStart)
+        ));
+    }
+
+    #[test]
+    fn test_skip_start_tolerates_spaces() {
+        assert!(matches!(
+            find("<!-- i18n: skip-start -->"),
+            Some(Directive::SkipStart)
+        ));
+    }
+
+    #[test]
+    fn test_skip_start_tolerates_dashes() {
+        assert!(matches!(
+            find("<!--- i18n:skip-start ---->"),
+            Some(Directive::SkipStart)
+        ));
+    }
+
+    #[test]
+    fn test_skip_start_different_prefix() {
+        assert!(matches!(
+            find("<!-- mdbook-xgettext:skip-start -->"),
+            Some(Directive::SkipStart)
+        ));
+    }
+
+    #[test]
+    fn test_skip_start_not_confused_with_skip() {
+        assert!(!matches!(
+            find("<!-- i18n:skip-start -->"),
+            Some(Directive::Skip)
+        ));
+    }
+
+    #[test]
+    fn test_skip_end_simple() {
+        assert!(matches!(
+            find("<!-- i18n:skip-end -->"),
+            Some(Directive::SkipEnd)
+        ));
+    }
+
+    #[test]
+    fn test_skip_end_tolerates_spaces() {
+        assert!(matches!(
+            find("<!-- i18n: skip-end -->"),
+            Some(Directive::SkipEnd)
+        ));
+    }
+
+    #[test]
+    fn test_skip_end_different_prefix() {
+        assert!(matches!(
+            find("<!-- mdbook-xgettext:skip-end -->"),
+            Some(Directive::SkipEnd)
         ));
     }
 

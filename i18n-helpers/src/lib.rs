@@ -210,6 +210,7 @@ pub enum Group<'a> {
 #[derive(Debug, Default)]
 struct GroupingContext {
     skip_next_group: bool,
+    skip_until_end: bool,
     comments: Vec<String>,
 }
 
@@ -227,6 +228,13 @@ impl GroupingContext {
 /// This function will partition the input events into groups of
 /// events which should be translated or skipped. Concatenating the
 /// events in each group will give you back the original events.
+///
+/// HTML comments control skipping:
+/// - `<!-- i18n:skip -->` skips the next translatable group.
+/// - `<!-- i18n:skip-start -->` begins a range where all subsequent
+///   groups are skipped until a matching `<!-- i18n:skip-end -->`.
+///   If `skip-end` is omitted, all remaining content is skipped.
+///   Nesting is not supported.
 ///
 /// # Examples
 ///
@@ -282,7 +290,7 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Result<Vec<Group<'a
         ) -> Result<(Vec<Group<'a>>, GroupingContext), CmarkError> {
             let groups = match self {
                 State::Translate(start) => {
-                    if ctx.skip_next_group {
+                    if ctx.skip_next_group || ctx.skip_until_end {
                         (
                             vec![Group::Skip(events[start..idx].into())],
                             ctx.clear_skip_next_group(),
@@ -394,6 +402,31 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Result<Vec<Group<'a
                         ctx.skip_next_group = true;
                     }
 
+                    Some(directives::Directive::SkipStart) => {
+                        if let State::Translate(_) = state {
+                            let mut next_groups;
+                            (next_groups, ctx) = state.into_groups(idx, events, ctx)?;
+                            groups.append(&mut next_groups);
+
+                            state = State::Translate(idx);
+                        }
+
+                        ctx.skip_until_end = true;
+                    }
+
+                    Some(directives::Directive::SkipEnd) => {
+                        if let State::Translate(_) = state {
+                            let mut next_groups;
+                            (next_groups, ctx) = state.into_groups(idx, events, ctx)?;
+                            groups.append(&mut next_groups);
+
+                            state = State::Translate(idx);
+                            ctx.skip_next_group = true;
+                        }
+
+                        ctx.skip_until_end = false;
+                    }
+
                     Some(directives::Directive::Comment(comment)) => {
                         // If in the middle of translation, finish it.
                         if let State::Translate(_) = state {
@@ -455,10 +488,16 @@ pub fn group_events<'a>(events: &'a [(usize, Event<'a>)]) -> Result<Vec<Group<'a
     }
 
     match state {
-        State::Translate(start) => groups.push(Group::Translate {
-            events: events[start..].into(),
-            comment: "".into(),
-        }),
+        State::Translate(start) => {
+            if ctx.skip_next_group || ctx.skip_until_end {
+                groups.push(Group::Skip(events[start..].into()));
+            } else {
+                groups.push(Group::Translate {
+                    events: events[start..].into(),
+                    comment: "".into(),
+                });
+            }
+        }
         State::Skip(start) => groups.push(Group::Skip(events[start..].into())),
     }
 
@@ -1746,6 +1785,132 @@ not-skipped",
     }
 
     #[test]
+    fn extract_messages_skip_start_skip_end_simple() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+This should be skipped.
+<!-- i18n:skip-end -->
+
+This should be translated.
+",
+            &[(5, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_skip_end_multiple_paragraphs() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+First skipped paragraph.
+
+Second skipped paragraph.
+
+Third skipped paragraph.
+<!-- i18n:skip-end -->
+
+This should be translated.
+",
+            &[(9, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_skip_end_codeblock() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+```
+def f(x): return x * x
+```
+<!-- i18n:skip-end -->
+
+This should be translated.
+",
+            &[(7, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_skip_end_list() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+* A
+* B
+* C
+<!-- i18n:skip-end -->
+
+This should be translated.
+",
+            &[(7, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_no_skip_end() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+This should be skipped.
+
+This should also be skipped.
+",
+            &[],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_end_no_skip_start() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-end -->
+This should be translated.
+",
+            &[(2, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_skip_end_with_single_skip() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+<!-- i18n:skip -->
+This should be skipped.
+
+This should also be skipped.
+<!-- i18n:skip-end -->
+
+This should be translated.
+",
+            &[(8, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_skip_end_back_to_back() {
+        assert_extract_messages(
+            r"<!-- i18n:skip-start -->
+Skipped.
+<!-- i18n:skip-end -->
+<!-- i18n:skip-start -->
+Also skipped.
+<!-- i18n:skip-end -->
+
+This should be translated.
+",
+            &[(8, "This should be translated.")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_start_skip_end_inline() {
+        assert_extract_messages(
+            "foo <!-- i18n:skip-start --> **bold** bar\n\
+             still skipped\n\
+             <!-- i18n:skip-end --> not-skipped\n\
+             \n\
+             also not-skipped",
+            &[(1, "foo "), (5, "also not-skipped")],
+        );
+    }
+
+    #[test]
     fn extract_messages_automatic_skipping_nontranslatable_codeblocks_simple() {
         assert_extract_messages(
             r"
@@ -2070,5 +2235,42 @@ some_syntax = do_something();
         let (reconstructed, _) = reconstruct_markdown(&translated, None).unwrap();
 
         assert_eq!(reconstructed, "คำศัพท์ 1\n: นิยาม 1\n");
+    }
+
+    #[test]
+    fn translate_events_skip_start_skip_end() {
+        use polib::catalog::Catalog;
+        use polib::message::Message;
+        use polib::metadata::CatalogMetadata;
+
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        let msg = Message::build_singular()
+            .with_msgid("Translated".into())
+            .with_msgstr("TRANSLATED".into())
+            .done();
+        catalog.append_or_update(msg);
+
+        let msg = Message::build_singular()
+            .with_msgid("Skipped".into())
+            .with_msgstr("SHOULD_NOT_APPEAR".into())
+            .done();
+        catalog.append_or_update(msg);
+
+        let events = extract_events(
+            "Translated\n\
+             \n\
+             <!-- i18n:skip-start -->\n\
+             Skipped\n\
+             <!-- i18n:skip-end -->\n\
+             \n\
+             Translated\n",
+            None,
+        );
+        let translated = translate_events(&events, &catalog).unwrap();
+        let (reconstructed, _) = reconstruct_markdown(&translated, None).unwrap();
+
+        assert!(reconstructed.contains("TRANSLATED"));
+        assert!(reconstructed.contains("Skipped"));
+        assert!(!reconstructed.contains("SHOULD_NOT_APPEAR"));
     }
 }

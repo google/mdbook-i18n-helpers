@@ -252,6 +252,35 @@ Itemized list:
 Note that we don't extract the full text of code blocks. Only text that is
 recognized as comments and literal strings is extracted.
 
+### Skipping a Range of Blocks
+
+To skip multiple consecutive blocks, use `<!-- i18n:skip-start -->` and
+`<!-- i18n:skip-end -->` around the content:
+
+````markdown
+This should be translated.
+
+<!-- i18n:skip-start -->
+
+This should be skipped.
+
+So should this.
+
+```
+fn hello() {
+  println!("Hello world!");
+}
+```
+
+<!-- i18n:skip-end -->
+
+This should be translated again.
+````
+
+Everything between `skip-start` and `skip-end` is skipped. If `skip-end` is
+omitted, all remaining content in the document is skipped. Nesting is not
+supported.
+
 ## Normalizing Existing PO Files
 
 When mdbook-i18n-helpers change, the generated PO files change as well. This can
