@@ -73,9 +73,16 @@ pub fn add_stripped_summary_translations(catalog: &mut Catalog) {
             continue;
         }
 
+        // SUMMARY.md holds singular chapter titles. A plural entry
+        // can't be one, and `msgstr` returns an error for plural
+        // messages, so skip it rather than unwrapping.
+        let Ok(msgstr) = msg.msgstr() else {
+            continue;
+        };
+
         let message = Message::build_singular()
             .with_msgid(strip_formatting(msg.msgid()))
-            .with_msgstr(strip_formatting(msg.msgstr().unwrap()))
+            .with_msgstr(strip_formatting(msgstr))
             .done();
         stripped_messages.push(message);
     }
@@ -166,6 +173,43 @@ mod tests {
                 ("", "foo bar", "FOO BAR")
             ]
         );
+    }
+
+    #[test]
+    fn test_add_stripped_summary_translations_skips_plural() {
+        // A plural entry sourced from SUMMARY.md must not crash:
+        // msgstr() errors on plural messages. It is skipped, while the
+        // singular entry next to it still gets a stripped version.
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        catalog.append_or_update(
+            Message::build_plural()
+                .with_source(String::from("src/SUMMARY.md:1"))
+                .with_msgid(String::from("One chapter"))
+                .with_msgid_plural(String::from("Many chapters"))
+                .with_msgstr_plural(vec![
+                    String::from("Ett kapitel"),
+                    String::from("Flera kapitel"),
+                ])
+                .done(),
+        );
+        catalog.append_or_update(
+            Message::build_singular()
+                .with_source(String::from("src/SUMMARY.md:2"))
+                .with_msgid(String::from("**Foo**"))
+                .with_msgstr(String::from("**BAR**"))
+                .done(),
+        );
+
+        add_stripped_summary_translations(&mut catalog);
+
+        // The stripped messages are appended without a source. Only the
+        // singular entry yields one; the plural entry is left as is.
+        let stripped = catalog
+            .messages()
+            .filter(|msg| msg.source().is_empty())
+            .map(|msg| (msg.msgid(), msg.msgstr().unwrap()))
+            .collect::<Vec<_>>();
+        assert_eq!(stripped, &[("Foo", "BAR")]);
     }
 
     #[test]
