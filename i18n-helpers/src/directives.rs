@@ -31,13 +31,17 @@ pub fn find(html: &str) -> Option<Directive> {
         (Some("skip"), Some("start")) => Some(Directive::SkipStart),
         (Some("skip"), Some("end")) => Some(Directive::SkipEnd),
         (Some("comment"), _) => {
-            let start_of_comment_offset = std::cmp::min(
-                command.find("comment").unwrap() + "comment".len() + 1,
-                command.len(),
-            );
-            Some(Directive::Comment(
-                command[start_of_comment_offset..].trim().into(),
-            ))
+            // "comment" is ASCII, so this offset is always on a char
+            // boundary. The separator after the keyword may be a multi-byte
+            // Unicode whitespace, so drop it via `chars()` rather than a fixed
+            // byte offset to avoid slicing inside a code point.
+            let after_keyword = command.find("comment").unwrap() + "comment".len();
+            let rest = &command[after_keyword..];
+            let body = match rest.chars().next() {
+                Some(c) if is_delimiter(c) => &rest[c.len_utf8()..],
+                _ => rest,
+            };
+            Some(Directive::Comment(body.trim().into()))
         }
         _ => None,
     }
@@ -166,6 +170,18 @@ mod tests {
         assert!(match find("<!-- i18n:comment -->") {
             Some(Directive::Comment(s)) => {
                 s.is_empty()
+            }
+            _ => false,
+        });
+    }
+
+    #[test]
+    fn test_comment_multibyte_separator() {
+        // A multi-byte Unicode whitespace (here a no-break space) separating
+        // the keyword from the body must not be sliced through.
+        assert!(match find("<!-- i18n:comment\u{a0}hello world! -->") {
+            Some(Directive::Comment(s)) => {
+                s == "hello world!"
             }
             _ => false,
         });
