@@ -35,7 +35,7 @@ fn compute_source(source: &str, delta: usize) -> String {
             new_source.push('\n');
         }
         if let Some((path, lineno)) = parse_source(path_lineno) {
-            new_source.push_str(&format!("{path}:{}", lineno + delta));
+            new_source.push_str(&format!("{path}:{}", lineno.saturating_add(delta)));
         } else {
             new_source.push_str(source);
         }
@@ -407,6 +407,34 @@ mod tests {
              BAR",
         )]);
         assert_normalized_messages_eq(catalog, &[exact("foo", "FOO"), exact("bar", "BAR")]);
+    }
+
+    #[test]
+    fn test_normalize_large_source_lineno() {
+        // A source line number close to `usize::MAX` must not overflow
+        // when the per-paragraph offset is added back. The msgid splits
+        // into two paragraphs, so the second one is emitted with a
+        // non-zero offset.
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        catalog.append_or_update(
+            Message::build_singular()
+                .with_source(format!("foo.md:{}", usize::MAX))
+                .with_msgid(String::from("foo\n\nbar"))
+                .with_msgstr(String::from("FOO\n\nBAR"))
+                .done(),
+        );
+        let normalized = normalize(catalog).expect("Could not normalize");
+        let sources = normalized
+            .messages()
+            .map(|msg| msg.source())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            sources,
+            &[
+                format!("foo.md:{}", usize::MAX),
+                format!("foo.md:{}", usize::MAX)
+            ],
+        );
     }
 
     #[test]
