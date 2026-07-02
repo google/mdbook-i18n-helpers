@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
+use std::path::{Component, Path};
 
 use crate::{extract_messages, new_cmark_parser, wrap_sources};
 use anyhow::Context;
@@ -16,6 +17,28 @@ use pulldown_cmark::{Event, LinkType, Tag};
 fn parse_source(source: &str) -> Option<(&str, usize)> {
     let (path, lineno) = source.split_once(':')?;
     Some((path, lineno.parse().ok()?))
+}
+
+/// Whether `path` is a relative path that stays inside the working
+/// directory.
+///
+/// The path comes from the `#:` source comment of the PO file, which
+/// is untrusted input. Only paths that neither start at the root nor
+/// climb above the current directory with `..` are safe to open.
+fn is_within_current_dir(path: &str) -> bool {
+    let mut depth: usize = 0;
+    for component in Path::new(path).components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => return false,
+            Component::ParentDir => match depth.checked_sub(1) {
+                Some(d) => depth = d,
+                None => return false,
+            },
+            Component::Normal(_) => depth += 1,
+            Component::CurDir => {}
+        }
+    }
+    true
 }
 
 /// Use only the potion of extract_messages that the normalizer cares about.
@@ -155,10 +178,15 @@ impl<'a> SourceMap<'a> {
         // Second, we attempt to add the original source file.
         // Catalogs made with version 0.1.0 to 0.2.0 did not include
         // the link definitions at all, so we need to rely on the
-        // source data (if we can find it).
-        if let Ok(mut file) = File::open(path) {
-            full_document.push_str("\n\n");
-            let _ = file.read_to_string(&mut full_document);
+        // source data (if we can find it). The path is taken verbatim
+        // from the PO file, so only open it when it stays within the
+        // working directory to avoid reading arbitrary files named in
+        // a crafted `#:` comment.
+        if is_within_current_dir(path) {
+            if let Ok(mut file) = File::open(path) {
+                full_document.push_str("\n\n");
+                let _ = file.read_to_string(&mut full_document);
+            }
         }
 
         let mut messages = extract_document_messages(&full_document)?;
@@ -435,6 +463,43 @@ mod tests {
                 format!("foo.md:{}", usize::MAX)
             ],
         );
+    }
+
+    #[test]
+    fn test_normalize_does_not_read_files_outside_current_dir() {
+        // A broken reference link triggers reading the source file
+        // named in the `#:` comment. That path is untrusted, so a path
+        // escaping the working directory must not be opened: the link
+        // stays broken instead of being resolved from the file.
+        let tmpdir = tempfile::tempdir().unwrap();
+        let secret = tmpdir.path().join("secret.md");
+        std::fs::write(&secret, "[undefined]: https://leaked.example/\n").unwrap();
+
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        catalog.append_or_update(
+            Message::build_singular()
+                .with_source(format!("{}:1", secret.display()))
+                .with_msgid(String::from("see [text][undefined]"))
+                .with_msgstr(String::new())
+                .done(),
+        );
+
+        let normalized = normalize(catalog).expect("Could not normalize");
+        let msgids = normalized
+            .messages()
+            .map(|msg| msg.msgid())
+            .collect::<Vec<_>>();
+        assert_eq!(msgids, &[r"see \[text\]\[undefined\]"]);
+    }
+
+    #[test]
+    fn test_is_within_current_dir() {
+        assert!(is_within_current_dir("foo.md"));
+        assert!(is_within_current_dir("src/foo.md"));
+        assert!(is_within_current_dir("src/../foo.md"));
+        assert!(!is_within_current_dir("/etc/passwd"));
+        assert!(!is_within_current_dir("../foo.md"));
+        assert!(!is_within_current_dir("src/../../foo.md"));
     }
 
     #[test]
