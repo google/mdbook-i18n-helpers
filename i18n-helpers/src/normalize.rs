@@ -165,8 +165,14 @@ impl<'a> SourceMap<'a> {
         // resolved using a table of link definitions as the bottom.
         // However, in practice, only a few messages will have such a
         // link and the whole thing seems to be fast enough.
+        // `path` is parsed from the whole source string. The keys in
+        // the source map are the individual whitespace-separated source
+        // references, so a message that lists several sources (e.g.
+        // `#: a.md b.md:1`) yields a combined `path` that is not a key.
+        // Look it up fallibly instead of indexing to avoid panicking on
+        // such a source.
         let mut full_document = String::from(document);
-        for (_, msgid, msgstr) in &self.messages[path] {
+        for (_, msgid, msgstr) in self.messages.get(path).into_iter().flatten() {
             let msg = field.project(msgid, msgstr);
             if msg == document {
                 continue;
@@ -484,6 +490,29 @@ mod tests {
                 .done(),
         );
 
+        let normalized = normalize(catalog).expect("Could not normalize");
+        let msgids = normalized
+            .messages()
+            .map(|msg| msg.msgid())
+            .collect::<Vec<_>>();
+        assert_eq!(msgids, &[r"see \[text\]\[undefined\]"]);
+    }
+
+    #[test]
+    fn test_normalize_multi_source_broken_link() {
+        // A message with a broken reference link triggers resolution
+        // via other messages sharing its source path. When the source
+        // lists several references, the path parsed from the whole
+        // source string does not match a source-map key, which must not
+        // panic: the link stays broken instead.
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        catalog.append_or_update(
+            Message::build_singular()
+                .with_source(String::from("foo bar.md:1"))
+                .with_msgid(String::from("see [text][undefined]"))
+                .with_msgstr(String::new())
+                .done(),
+        );
         let normalized = normalize(catalog).expect("Could not normalize");
         let msgids = normalized
             .messages()
