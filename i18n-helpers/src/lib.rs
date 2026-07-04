@@ -41,6 +41,19 @@ pub mod preprocessors;
 pub mod renderers;
 pub mod xgettext;
 
+/// Parse the PO/POT file at `path` into a catalog.
+///
+/// `polib::po_file::parse` panics on some malformed input (for example a
+/// `msgid` line whose value is not wrapped in quotes) instead of returning an
+/// error. Guard the call so an invalid translation file is reported as a parse
+/// error rather than aborting the process.
+pub fn parse_catalog(path: &std::path::Path) -> anyhow::Result<Catalog> {
+    match std::panic::catch_unwind(|| polib::po_file::parse(path)) {
+        Ok(result) => result.map_err(|err| anyhow::anyhow!("{err}")),
+        Err(_) => Err(anyhow::anyhow!("{path:?} is not a valid PO file")),
+    }
+}
+
 /// Re-wrap the sources field of a message.
 ///
 /// This function tries to wrap the `file:lineno` pairs so they look
@@ -997,6 +1010,34 @@ mod tests {
     use pulldown_cmark::Event::*;
     use pulldown_cmark::HeadingLevel::*;
     use pulldown_cmark::Tag::*;
+
+    #[test]
+    fn parse_catalog_reads_valid_po() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("valid.po");
+        std::fs::write(
+            &path,
+            "msgid \"\"\n\
+             msgstr \"\"\n\
+             \"Content-Type: text/plain; charset=UTF-8\\n\"\n\
+             \n\
+             msgid \"Hello\"\n\
+             msgstr \"Bonjour\"\n",
+        )
+        .unwrap();
+        let catalog = parse_catalog(&path).unwrap();
+        assert_eq!(catalog.messages().count(), 1);
+    }
+
+    #[test]
+    fn parse_catalog_reports_malformed_po_as_error() {
+        // An unquoted `msgid` value makes polib panic while slicing off the
+        // surrounding quotes; it must surface as an error instead of crashing.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("malformed.po");
+        std::fs::write(&path, "msgid x\n").unwrap();
+        assert!(parse_catalog(&path).is_err());
+    }
 
     /// Extract messages in `document`, assert they match `expected`.
     #[track_caller]

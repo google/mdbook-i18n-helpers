@@ -13,7 +13,7 @@
 use std::path::Path;
 
 use anyhow::{bail, Context};
-use mdbook_i18n_helpers::normalize::normalize;
+use mdbook_i18n_helpers::{normalize::normalize, parse_catalog};
 use polib::po_file;
 
 fn main() -> anyhow::Result<()> {
@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
         [] => unreachable!(),
     };
 
-    let catalog = po_file::parse(Path::new(input))
+    let catalog = parse_catalog(Path::new(input))
         .with_context(|| format!("Could not parse {:?}", &output))?;
     let normalized = normalize(catalog)?;
     po_file::write_to_file(&normalized, Path::new(output))

@@ -16,7 +16,6 @@ use crate::gettext::{add_stripped_summary_translations, translate_book};
 use anyhow::{anyhow, Context};
 use mdbook_preprocessor::{Preprocessor, PreprocessorContext};
 use polib::catalog::Catalog;
-use polib::po_file;
 use std::path::PathBuf;
 
 /// Check whether the book should be transalted.
@@ -56,8 +55,7 @@ fn get_catalog_path(ctx: &PreprocessorContext) -> anyhow::Result<PathBuf> {
 fn load_catalog(ctx: &PreprocessorContext) -> anyhow::Result<Catalog> {
     let path = get_catalog_path(ctx)?;
 
-    let catalog = po_file::parse(&path)
-        .map_err(|err| anyhow!("{err}"))
+    let catalog = crate::parse_catalog(&path)
         .with_context(|| format!("Could not parse {path:?} as PO file"))?;
 
     Ok(catalog)
