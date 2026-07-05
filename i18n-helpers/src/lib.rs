@@ -47,6 +47,8 @@ pub mod xgettext;
 /// `msgid` line whose value is not wrapped in quotes) instead of returning an
 /// error. Guard the call so an invalid translation file is reported as a parse
 /// error rather than aborting the process.
+///
+/// Remove when https://github.com/BrettDong/polib/issues/25 is closed.
 pub fn parse_catalog(path: &std::path::Path) -> anyhow::Result<Catalog> {
     match std::panic::catch_unwind(|| polib::po_file::parse(path)) {
         Ok(result) => result.map_err(|err| anyhow::anyhow!("{err}")),

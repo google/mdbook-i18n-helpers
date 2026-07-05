@@ -106,6 +106,8 @@ fn all_stats(files: &[PathBuf]) -> anyhow::Result<Vec<MessageStats>> {
 /// `msgid` line whose value is not wrapped in quotes) instead of returning an
 /// error. Guard the call so an invalid file is reported as an error rather
 /// than aborting the process.
+///
+/// Remove when https://github.com/BrettDong/polib/issues/25 is closed.
 fn parse_catalog(path: &Path) -> anyhow::Result<Catalog> {
     match std::panic::catch_unwind(|| po_file::parse(path)) {
         Ok(result) => result.map_err(|err| anyhow::anyhow!("{err}")),
