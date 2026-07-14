@@ -19,6 +19,7 @@ mod stats;
 
 use anyhow::Context as _;
 use clap::Parser;
+use polib::catalog::Catalog;
 use polib::po_file;
 use stats::MessageStats;
 use std::{
@@ -91,12 +92,27 @@ fn all_stats(files: &[PathBuf]) -> anyhow::Result<Vec<MessageStats>> {
     files
         .iter()
         .map(|translation| {
-            let catalog = po_file::parse(translation)
+            let catalog = parse_catalog(translation)
                 .with_context(|| format!("Could not parse {:?}", &translation))?;
             let stats = MessageStats::for_catalog(&catalog);
             Ok(stats)
         })
         .collect()
+}
+
+/// Parse the PO file at `path`.
+///
+/// `polib::po_file::parse` panics on some malformed input (for example a
+/// `msgid` line whose value is not wrapped in quotes) instead of returning an
+/// error. Guard the call so an invalid file is reported as an error rather
+/// than aborting the process.
+///
+/// Remove when https://github.com/BrettDong/polib/issues/25 is closed.
+fn parse_catalog(path: &Path) -> anyhow::Result<Catalog> {
+    match std::panic::catch_unwind(|| po_file::parse(path)) {
+        Ok(result) => result.map_err(|err| anyhow::anyhow!("{err}")),
+        Err(_) => Err(anyhow::anyhow!("{path:?} is not a valid PO file")),
+    }
 }
 
 /// Prints a report showing any difference between two directories of language files.
