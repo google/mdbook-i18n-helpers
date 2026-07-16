@@ -16,7 +16,7 @@ workspace = true
 anyhow.workspace = true
 mdbook-renderer.workspace = true
 serde = "1.0"
-tera = "1.20.1"
+tera = "2.0.0"
 
 [dev-dependencies]
 mdbook-driver.workspace = true
