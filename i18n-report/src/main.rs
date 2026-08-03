@@ -92,7 +92,7 @@ fn all_stats(files: &[PathBuf]) -> anyhow::Result<Vec<MessageStats>> {
         .iter()
         .map(|translation| {
             let catalog = po_file::parse(translation)
-                .with_context(|| format!("Could not parse {:?}", &translation))?;
+                .with_context(|| format!("Could not parse {:?}", translation))?;
             let stats = MessageStats::for_catalog(&catalog);
             Ok(stats)
         })
