@@ -76,7 +76,7 @@ impl Renderer {
 
         let rendered_file = self
             .tera_template
-            .render_str(file_content, &tera_context)
+            .render_str(file_content, &tera_context, false)
             .map_err(|e| anyhow!("Error rendering file {path:?}: {e:?}"))?;
         Ok(rendered_file)
     }
