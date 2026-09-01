@@ -183,9 +183,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.6.4"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d91e0c145792ef73a6ad36d27c75ac09f1832222a3c209689d90f534685ee5b7"
+checksum = "473c7e07f409a8d772161724aa8db6a765a2532a70f9667eeb7b49d3d02fbdca"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -193,9 +193,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.6.2"
+version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09628afdcc538b57f3c6341e9c8e9970f18e4a481690a64974d7023bd33548b"
+checksum = "7b48fea5a88e9ae728a2dcbedbfc0e730f7d60da42e1cb049a83c9fb8b789889"
 dependencies = [
  "anstream",
  "anstyle",
@@ -463,9 +463,9 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "font-awesome-as-a-crate"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "932dcfbd51320af5f27f1ba02d2e567dec332cac7d2c221ba45d8e767264c4dc"
+checksum = "b40fbe89eb7639971503bf5f17bd31c41338e8f92e03c5744d07f2e03d43f679"
 
 [[package]]
 name = "generic-array"
@@ -694,9 +694,9 @@ dependencies = [
 
 [[package]]
 name = "mdbook-driver"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2068566fc3c100cfd19f4a13e4e0eb4fdcd2250cfd0aa633ec25102b1c98d53e"
+checksum = "485612ee2a91847760e742ce441673fa127306a43f44e666796f7d99d4592272"
 dependencies = [
  "anyhow",
  "indexmap",
@@ -718,9 +718,9 @@ dependencies = [
 
 [[package]]
 name = "mdbook-html"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85ed2140251689f928615f0a5615413eb072eb28e003d179257aa4f034c95513"
+checksum = "8d25933e4d7cbaa342db9ab9f414c2a09b1c59becb63ad344520370d822ab28a"
 dependencies = [
  "anyhow",
  "ego-tree",
@@ -777,9 +777,9 @@ dependencies = [
 
 [[package]]
 name = "mdbook-markdown"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cb3ca9eadf02ce206118a0b9c264718723d669b110c01a720fa9a0786f30642"
+checksum = "9ca553aa4330b15fa2c706aef373bc714cc719513d1da73c17be3dba208b9aab"
 dependencies = [
  "pulldown-cmark",
  "regex",
@@ -812,9 +812,9 @@ dependencies = [
 
 [[package]]
 name = "mdbook-summary"
-version = "0.5.3"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae8a734e5e35b0bc145b46d01fd27e266ba647dcdb9b8c907cb6a29eca9122b"
+checksum = "2453622fa7236139365a9acd20314ab859ff747d57ba36ff0d476b64adc75cf8"
 dependencies = [
  "anyhow",
  "mdbook-core",
@@ -1061,9 +1061,9 @@ checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
 
 [[package]]
 name = "pulldown-cmark-to-cmark"
-version = "22.0.0"
+version = "22.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50793def1b900256624a709439404384204a5dc3a6ec580281bfaac35e882e90"
+checksum = "ab1ad36992cead65f02aa399a373a42730922f1525d988172634fdefdecb8a60"
 dependencies = [
  "pulldown-cmark",
 ]
@@ -1226,9 +1226,9 @@ dependencies = [
 
 [[package]]
 name = "shlex"
-version = "1.3.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
+checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "siphasher"
