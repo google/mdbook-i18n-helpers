@@ -731,4 +731,95 @@ mod tests {
             String::from("not a valid date")
         )
     }
+
+    #[test]
+    fn test_parse_source() {
+        assert_eq!(parse_source("foo.md:42"), Some(("foo.md", 42)));
+        assert_eq!(
+            parse_source("src/chapter/sub.md:0"),
+            Some(("src/chapter/sub.md", 0))
+        );
+        assert_eq!(parse_source(":10"), Some(("", 10)));
+        assert_eq!(parse_source("no_colon.md"), None);
+        assert_eq!(parse_source("foo.md:not_a_number"), None);
+        assert_eq!(parse_source("foo.md:"), None);
+        assert_eq!(parse_source(""), None);
+    }
+
+    #[test]
+    fn test_compute_source() {
+        assert_eq!(compute_source("foo.md:10", 5), "foo.md:15");
+        assert_eq!(compute_source("foo.md:10", 0), "foo.md:10");
+        assert_eq!(
+            compute_source("foo.md:10 bar.md:20", 3),
+            "foo.md:13 bar.md:23"
+        );
+        assert_eq!(
+            compute_source("foo.md:10\nbar.md:20", 3),
+            "foo.md:13 bar.md:23"
+        );
+        assert_eq!(compute_source("unversioned_file", 5), "unversioned_file");
+        assert_eq!(
+            compute_source(&format!("foo.md:{}", usize::MAX - 2), 5),
+            format!("foo.md:{}", usize::MAX)
+        );
+    }
+
+    #[test]
+    fn test_has_broken_link() {
+        assert!(!has_broken_link("just plain text"));
+        assert!(!has_broken_link(
+            "see [example](https://example.com) for details"
+        ));
+        assert!(!has_broken_link("valid autolink <https://example.com>"));
+        assert!(has_broken_link("broken reference link [text][missing-ref]"));
+        assert!(has_broken_link("broken collapsed link [missing-ref][]"));
+        assert!(has_broken_link("broken shortcut link [missing-ref]"));
+    }
+
+    #[test]
+    fn test_source_map_extract_messages_truncation() {
+        let catalog = create_catalog(&[
+            (
+                "First line of target.\nSecond line with [ref].\nThird line of target.",
+                "First line translated.\nSecond line with [ref].\nThird line translated.",
+            ),
+            (
+                "[ref]: https://example.com/target-ref",
+                "[ref]: https://example.com/target-ref",
+            ),
+        ]);
+        let normalized = normalize(catalog).expect("Could not normalize");
+        let messages = normalized
+            .messages()
+            .map(|msg| (msg.msgid(), msg.source()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            messages,
+            &[(
+                "First line of target. Second line with [ref](https://example.com/target-ref). Third line of target.",
+                "foo.md:0"
+            )]
+        );
+    }
+
+    #[test]
+    fn test_normalize_paragraphs_source_line_offset() {
+        let catalog = create_catalog(&[(
+            "First paragraph\n\nSecond paragraph",
+            "Erster Absatz\n\nZweiter Absatz",
+        )]);
+        let normalized = normalize(catalog).expect("Could not normalize");
+        let sources = normalized
+            .messages()
+            .map(|msg| (msg.msgid(), msg.source()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            sources,
+            &[
+                ("First paragraph", "foo.md:0"),
+                ("Second paragraph", "foo.md:2"),
+            ]
+        );
+    }
 }
