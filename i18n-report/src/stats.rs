@@ -118,3 +118,143 @@ impl Display for MessageStats {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use polib::{message::Message, metadata::CatalogMetadata};
+
+    fn sample_stats() -> MessageStats {
+        MessageStats {
+            language: "fr".to_string(),
+            pot_creation_date: "2026-01-02 03:04+0000".to_string(),
+            non_translated_count: 2,
+            translated_count: 3,
+            fuzzy_non_translated_count: 4,
+            fuzzy_translated_count: 7,
+        }
+    }
+
+    #[test]
+    fn empty_catalog() {
+        let mut metadata = CatalogMetadata::new();
+        metadata.language = "fr".to_string();
+        metadata.pot_creation_date = "2026-01-02 03:04+0000".to_string();
+        let catalog = Catalog::new(metadata);
+
+        assert_eq!(
+            MessageStats::for_catalog(&catalog),
+            MessageStats {
+                language: "fr".to_string(),
+                pot_creation_date: "2026-01-02 03:04+0000".to_string(),
+                ..MessageStats::default()
+            }
+        );
+    }
+
+    #[test]
+    fn catalog_counts_translation_statuses() {
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        for (count, translation, flags) in [
+            (1, "", ""),
+            (2, "Bonjour", ""),
+            (3, "", "fuzzy"),
+            (4, "Bonjour", "fuzzy"),
+        ] {
+            for index in 0..count {
+                catalog.append_or_update(
+                    Message::build_singular()
+                        .with_msgid(format!("Message {count}-{index}"))
+                        .with_msgstr(translation.to_string())
+                        .with_flags(flags.parse().unwrap())
+                        .done(),
+                );
+            }
+        }
+
+        assert_eq!(
+            MessageStats::for_catalog(&catalog),
+            MessageStats {
+                language: catalog.metadata.language.clone(),
+                pot_creation_date: catalog.metadata.pot_creation_date.clone(),
+                non_translated_count: 1,
+                translated_count: 2,
+                fuzzy_non_translated_count: 3,
+                fuzzy_translated_count: 4,
+            }
+        );
+    }
+
+    #[test]
+    fn catalog_counts_plural_messages() {
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        for (index, (translations, flags)) in [
+            (["", ""], ""),
+            (["Un", ""], ""),
+            (["Un", "Plusieurs"], ""),
+            (["", ""], "fuzzy"),
+            (["", "Plusieurs"], "fuzzy"),
+            (["Un", "Plusieurs"], "fuzzy"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            catalog.append_or_update(
+                Message::build_plural()
+                    .with_msgid(format!("One {index}"))
+                    .with_msgid_plural(format!("Many {index}"))
+                    .with_msgstr_plural(translations.into_iter().map(String::from).collect())
+                    .with_flags(flags.parse().unwrap())
+                    .done(),
+            );
+        }
+
+        assert_eq!(
+            MessageStats::for_catalog(&catalog),
+            MessageStats {
+                language: catalog.metadata.language.clone(),
+                pot_creation_date: catalog.metadata.pot_creation_date.clone(),
+                non_translated_count: 2,
+                translated_count: 1,
+                fuzzy_non_translated_count: 2,
+                fuzzy_translated_count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn total_includes_all_statuses() {
+        assert_eq!(MessageStats::default().total(), 0);
+        assert_eq!(sample_stats().total(), 16);
+    }
+
+    #[test]
+    fn template_context() {
+        let expected = BTreeMap::from([
+            ("language".to_string(), "fr".into()),
+            (
+                "pot_creation_date".to_string(),
+                "2026-01-02 03:04+0000".into(),
+            ),
+            ("non_translated_count".to_string(), 2u32.into()),
+            ("translated_count".to_string(), 3u32.into()),
+            ("fuzzy_non_translated_count".to_string(), 4u32.into()),
+            ("fuzzy_translated_count".to_string(), 7u32.into()),
+            ("non_translated_percent".to_string(), 12.5.into()),
+            ("translated_percent".to_string(), 18.75.into()),
+            ("fuzzy_non_translated_percent".to_string(), 25.0.into()),
+            ("fuzzy_translated_percent".to_string(), 43.75.into()),
+            ("total".to_string(), 16u32.into()),
+        ]);
+
+        assert_eq!(sample_stats().to_context(), expected);
+    }
+
+    #[test]
+    fn display_summary() {
+        assert_eq!(
+            sample_stats().to_string(),
+            "fr: 3 (7, 4) / 16, creation date 2026-01-02 03:04+0000"
+        );
+    }
+}
