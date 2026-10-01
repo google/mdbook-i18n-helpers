@@ -14,6 +14,7 @@ env:
 jobs:
   test:
     name: Test
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -52,6 +53,7 @@ jobs:
             ref: 1b91548093ee91b4d4f63ed97419c07243923df9
 
     name: Test with ${{ matrix.repo }}
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -85,6 +87,7 @@ jobs:
 
   fuzz:
     name: Fuzz test
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -128,6 +131,7 @@ jobs:
           cargo fuzz cmin xgettext
 
   clippy:
+    permissions: {}
     name: Clippy
     runs-on: ubuntu-latest
     steps:
@@ -140,6 +144,7 @@ jobs:
         run: cargo clippy --all-targets
 
   format:
+    permissions: {}
     name: Format
     runs-on: ubuntu-latest
     steps:
