@@ -14,12 +14,13 @@ env:
 jobs:
   test:
     name: Test
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
@@ -29,13 +30,15 @@ jobs:
           git diff --exit-code
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
+        with:
+          tool: cargo-llvm-cov
 
       - name: Run tests with Coverage report enabled
         run: cargo llvm-cov test --all-features --workspace --codecov --locked --output-path codecov_report.json
 
       - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           files: ./codecov_report.json
 
@@ -50,12 +53,13 @@ jobs:
             ref: 1b91548093ee91b4d4f63ed97419c07243923df9
 
     name: Test with ${{ matrix.repo }}
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
@@ -67,7 +71,7 @@ jobs:
           cargo install --debug --locked --version 0.5.0 mdbook
 
       - name: Checkout ${{ matrix.repo }}
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ matrix.repo }}
           ref: ${{ matrix.ref }}
@@ -83,15 +87,16 @@ jobs:
 
   fuzz:
     name: Fuzz test
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install nightly Rust
         run: rustup default nightly
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           # Default is "v0-rust"
           # Use a separate key to prevent collision with main cache
@@ -126,23 +131,25 @@ jobs:
           cargo fuzz cmin xgettext
 
   clippy:
+    permissions: {}
     name: Clippy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
       - name: Clippy
         run: cargo clippy --all-targets
 
   format:
+    permissions: {}
     name: Format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Rust nightly
         run: rustup default stable
@@ -151,4 +158,4 @@ jobs:
         run: rustup component add rustfmt
 
       - name: Check Formatting
-        uses: dprint/check@v2.3
+        uses: dprint/check@7dc032d8874778fc024f6f9b4a7e6d896782c330 # v2.5
