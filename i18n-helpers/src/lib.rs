@@ -2274,4 +2274,44 @@ some_syntax = do_something();
         assert!(reconstructed.contains("Skipped"));
         assert!(!reconstructed.contains("SHOULD_NOT_APPEAR"));
     }
+
+    #[test]
+    fn extract_messages_reference_image() {
+        // Like reference links, reference images are expanded on the fly.
+        assert_extract_messages(
+            "![Logo][1]\n\n\
+             [1]: https://example.com/logo.png",
+            &[(1, "![Logo](https://example.com/logo.png)")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_shortcut_image() {
+        assert_extract_messages(
+            "![logo]\n\n\
+             [logo]: https://example.com/logo.png",
+            &[(1, "![logo](https://example.com/logo.png)")],
+        );
+    }
+
+    #[test]
+    fn translate_events_ignores_fuzzy_translation() {
+        use polib::catalog::Catalog;
+        use polib::message::{Message, MessageMutView};
+        use polib::metadata::CatalogMetadata;
+
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        let mut msg = Message::build_singular()
+            .with_msgid("Fuzzy".into())
+            .with_msgstr("FUZZY".into())
+            .done();
+        msg.flags_mut().add_flag("fuzzy");
+        catalog.append_or_update(msg);
+
+        let events = extract_events("Fuzzy", None);
+        let translated = translate_events(&events, &catalog).unwrap();
+        let (reconstructed, _) = reconstruct_markdown(&translated, None).unwrap();
+
+        assert_eq!(reconstructed, "Fuzzy");
+    }
 }
