@@ -612,60 +612,58 @@ fn parse_codeblock<'a>(
             (text_line, Event::Text(text)) => {
                 let mut stack = ScopeStack::new();
                 let mut stack_failure = false;
-
-                let Ok(ops) = ps.parse_line(text, ss) else {
-                    // If parse is failed, the text event should be translated.
-                    ret.push(Group::Translate {
-                        events: events[idx..idx + 1].into(),
-                        comment: std::mem::take(&mut ctx.comments).join(" "),
-                    });
-                    continue;
-                };
-
                 let mut translate_events = vec![];
                 let mut groups = vec![];
 
-                for (range, op) in ScopeRangeIterator::new(&ops, text) {
-                    if stack.apply(op).is_err() {
+                // ParseState carries syntax context between lines, while parse_line expects one
+                // line per call. Keep the scope stack as well so multi-line scopes stay intact.
+                for (line_offset, line) in text.split_inclusive('\n').enumerate() {
+                    let Ok(ops) = ps.parse_line(line, ss) else {
                         stack_failure = true;
                         break;
-                    }
-
-                    if range.is_empty() {
-                        continue;
-                    }
-
-                    // Calculate line number of the range
-                    let range_line = if range.start == 0 {
-                        *text_line
-                    } else {
-                        text_line + text[0..range.start].lines().count() - 1
                     };
 
-                    let text = &text[range];
-
-                    // Whitespaces between translate texts should be added to translate
-                    // group.
-                    // So all whitespaces are added to the translate events buffer temporary,
-                    // and the trailing whitespaces will be remvoed finally.
-                    let is_whitespace = text.trim_matches(&[' ', '\t'] as &[_]).is_empty();
-
-                    let is_translate = stack.scopes.iter().any(|x| is_translate_scope(*x));
-
-                    if is_translate || (is_whitespace && !translate_events.is_empty()) {
-                        translate_events.push((range_line, Event::Text(text.into())));
-                    } else {
-                        let whitespace_events = extract_trailing_whitespaces(&mut translate_events);
-                        if !translate_events.is_empty() {
-                            groups.push(Group::Translate {
-                                events: std::mem::take(&mut translate_events),
-                                comment: std::mem::take(&mut ctx.comments).join(" "),
-                            });
+                    for (range, op) in ScopeRangeIterator::new(&ops, line) {
+                        if stack.apply(op).is_err() {
+                            stack_failure = true;
+                            break;
                         }
-                        if !whitespace_events.is_empty() {
-                            groups.push(Group::Skip(whitespace_events));
+
+                        if range.is_empty() {
+                            continue;
                         }
-                        groups.push(Group::Skip(vec![(range_line, Event::Text(text.into()))]));
+
+                        let range_line = text_line + line_offset;
+                        let text = &line[range];
+
+                        // Whitespaces between translate texts should be added to translate
+                        // group.
+                        // So all whitespaces are added to the translate events buffer temporary,
+                        // and the trailing whitespaces will be remvoed finally.
+                        let is_whitespace = text.trim_matches(&[' ', '\t'] as &[_]).is_empty();
+
+                        let is_translate = stack.scopes.iter().any(|x| is_translate_scope(*x));
+
+                        if is_translate || (is_whitespace && !translate_events.is_empty()) {
+                            translate_events.push((range_line, Event::Text(text.into())));
+                        } else {
+                            let whitespace_events =
+                                extract_trailing_whitespaces(&mut translate_events);
+                            if !translate_events.is_empty() {
+                                groups.push(Group::Translate {
+                                    events: std::mem::take(&mut translate_events),
+                                    comment: std::mem::take(&mut ctx.comments).join(" "),
+                                });
+                            }
+                            if !whitespace_events.is_empty() {
+                                groups.push(Group::Skip(whitespace_events));
+                            }
+                            groups.push(Group::Skip(vec![(range_line, Event::Text(text.into()))]));
+                        }
+                    }
+
+                    if stack_failure {
+                        break;
                     }
                 }
 
@@ -1471,6 +1469,32 @@ The document[^1] text.
                 (9, "// single line comment\n"),
                 (10, "// single line comment\n"),
             ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_code_block_comment_line_numbers() {
+        assert_extract_messages(
+            r#"```python
+# first
+print(1)
+# second
+print(2)
+```"#,
+            &[(2, "# first\n"), (4, "# second\n")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_consecutive_shell_comments() {
+        assert_extract_messages(
+            r#"```bash
+# first
+# second
+# third
+echo done
+```"#,
+            &[(2, "# first\n# second\n# third\n")],
         );
     }
 
