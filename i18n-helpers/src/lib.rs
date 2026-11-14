@@ -25,8 +25,7 @@
 
 use polib::catalog::Catalog;
 use pulldown_cmark::{
-    BlockQuoteKind, BrokenLinkCallback, CodeBlockKind, DefaultBrokenLinkCallback, Event, LinkType,
-    Tag, TagEnd,
+    BrokenLinkCallback, CodeBlockKind, DefaultBrokenLinkCallback, Event, LinkType, Tag, TagEnd,
 };
 use pulldown_cmark_to_cmark::{calculate_code_block_token_count, cmark_resume_with_options};
 use pulldown_cmark_to_cmark::{Error as CmarkError, Options, State};
@@ -918,7 +917,6 @@ pub fn translate_events<'a>(
 ) -> Result<Vec<(usize, Event<'a>)>, CmarkError> {
     let mut translated_events = Vec::new();
     let mut state = None;
-    let mut pending_alert_kind: Option<BlockQuoteKind> = None;
 
     for group in group_events(events)? {
         match group {
@@ -929,44 +927,23 @@ pub fn translate_events<'a>(
                     .find_message(None, &msgid, None)
                     .filter(|msg| !msg.flags().is_fuzzy() && msg.is_translated())
                     .and_then(|msg| msg.msgstr().ok());
-                let gfm_kind = pending_alert_kind.take();
-
                 match translated {
                     Some(msgstr) => {
-                        let trimmed =
-                            trim_paragraph(&extract_events(msgstr, state.clone()), &events)
-                                .to_vec();
-                        if let Some(kind) = gfm_kind {
-                            // Wrap body inside blockquote to preserve indentation.
-                            let mut wrapped = vec![(0, Event::Start(Tag::BlockQuote(Some(kind))))];
-                            wrapped.extend(trimmed);
-                            wrapped.push((0, Event::End(TagEnd::BlockQuote(Some(kind)))));
-                            translated_events.extend_from_slice(&wrapped);
-                        } else {
-                            translated_events.extend_from_slice(&trimmed);
-                        }
+                        // Generate new events for `msgstr`, taking
+                        // care to trim away unwanted paragraphs.
+                        translated_events.extend_from_slice(trim_paragraph(
+                            &extract_events(msgstr, state),
+                            &events,
+                        ));
                     }
-                    None => {
-                        // Emit GFM alert marker, then output body as-is (no wrapping).
-                        if let Some(kind) = gfm_kind {
-                            translated_events.extend_from_slice(&[
-                                (0, Event::Start(Tag::BlockQuote(Some(kind)))),
-                                (0, Event::End(TagEnd::BlockQuote(Some(kind)))),
-                            ]);
-                        }
-                        translated_events.extend_from_slice(&events);
-                    }
+                    None => translated_events.extend_from_slice(&events),
                 }
                 // Advance the state.
                 state = Some(new_state);
             }
             Group::Skip(events) => {
-                // For GFM alert, defer to Translate arm to avoid duplicate output.
-                if let Some((_, Event::Start(Tag::BlockQuote(Some(kind))))) = events.first() {
-                    pending_alert_kind = Some(*kind);
-                } else {
-                    translated_events.extend_from_slice(&events);
-                }
+                // Copy the events unchanged to the output.
+                translated_events.extend_from_slice(&events);
                 // Advance the state.
                 let (_, new_state) = reconstruct_markdown(&events, state)?;
                 state = Some(new_state);
