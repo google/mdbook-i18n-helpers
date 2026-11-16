@@ -478,6 +478,35 @@ mod tests {
     }
 
     #[test]
+    fn test_translate_gfm_alert_untranslated_body() {
+        // The body of the alert must stay inside the alert when there
+        // is no translation for it.
+        let catalog = create_catalog(&[]);
+        assert_eq!(
+            translate("> [!NOTE]\n> Hello world.", &catalog).unwrap(),
+            " > [!NOTE]\n > Hello world.",
+        );
+    }
+
+    #[test]
+    fn test_translate_gfm_alert_multiple_paragraphs() {
+        let catalog = create_catalog(&[("First.", "FIRST."), ("Second.", "SECOND.")]);
+        assert_eq!(
+            translate("> [!WARNING]\n> First.\n>\n> Second.\n\nAfter.", &catalog).unwrap(),
+            " > [!WARNING]\n > FIRST.\n > \n > SECOND.\n\nAfter.",
+        );
+    }
+
+    #[test]
+    fn test_translate_gfm_alert_block_content() {
+        let catalog = create_catalog(&[("Title", "TITLE"), ("one", "ONE")]);
+        assert_eq!(
+            translate("> [!TIP]\n> # Title\n>\n> - one\n> - two", &catalog).unwrap(),
+            " > [!TIP]\n > # TITLE\n > \n > - ONE\n > - two",
+        );
+    }
+
+    #[test]
     fn test_translate_inline_html() {
         let catalog = create_catalog(&[("foo <b>bar</b> baz", "FOO <b>BAR</b> BAZ")]);
         assert_eq!(
