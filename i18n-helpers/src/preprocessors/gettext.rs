@@ -88,3 +88,149 @@ impl Preprocessor for Gettext {
         Ok(renderer != "xgettext")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mdbook_preprocessor::book::{Book, BookItem, Chapter};
+    use mdbook_preprocessor::config::Config;
+    use pretty_assertions::assert_eq;
+    use std::str::FromStr;
+
+    const DANISH_PO: &str = r#"
+msgid ""
+msgstr ""
+"Language: da\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Hello"
+msgstr "Hej"
+"#;
+
+    /// Create a context for a book rooted in a fresh temporary directory.
+    fn create_context(book_toml: &str) -> (PreprocessorContext, tempfile::TempDir) {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let config = Config::from_str(book_toml).unwrap();
+        let ctx = PreprocessorContext::new(tmpdir.path().to_path_buf(), config, "html".into());
+        (ctx, tmpdir)
+    }
+
+    fn write_po_file(ctx: &PreprocessorContext, relative_path: &str, contents: &str) {
+        let path = ctx.root.join(relative_path);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, contents).unwrap();
+    }
+
+    fn create_book(content: &str) -> Book {
+        let mut book = Book::new();
+        book.push_item(BookItem::Chapter(Chapter::new(
+            "Hello",
+            content.into(),
+            PathBuf::from("hello.md"),
+            Vec::new(),
+        )));
+        book
+    }
+
+    fn chapter_content(book: &Book) -> &str {
+        match book.items.first() {
+            Some(BookItem::Chapter(chapter)) => &chapter.content,
+            item => panic!("expected a chapter, got {item:?}"),
+        }
+    }
+
+    #[test]
+    fn test_name() {
+        assert_eq!(Gettext.name(), "gettext");
+    }
+
+    #[test]
+    fn test_supports_renderer() {
+        assert!(Gettext.supports_renderer("html").unwrap());
+        assert!(Gettext.supports_renderer("markdown").unwrap());
+        // The xgettext renderer extracts the untranslated text.
+        assert!(!Gettext.supports_renderer("xgettext").unwrap());
+    }
+
+    #[test]
+    fn test_get_catalog_path_default_po_dir() {
+        let (ctx, tmpdir) = create_context("[book]\nlanguage = \"da\"");
+        assert_eq!(
+            get_catalog_path(&ctx).unwrap(),
+            tmpdir.path().join("po").join("da.po")
+        );
+    }
+
+    #[test]
+    fn test_get_catalog_path_custom_po_dir() {
+        let (ctx, tmpdir) = create_context(
+            "[book]\nlanguage = \"da\"\n\n[preprocessor.gettext]\npo-dir = \"translations\"",
+        );
+        assert_eq!(
+            get_catalog_path(&ctx).unwrap(),
+            tmpdir.path().join("translations").join("da.po")
+        );
+    }
+
+    #[test]
+    fn test_get_catalog_path_without_language() {
+        let (mut ctx, _tmpdir) = create_context("");
+        // mdbook defaults the language to "en", so clear it explicitly.
+        ctx.config.book.language = None;
+        assert!(get_catalog_path(&ctx).is_err());
+    }
+
+    #[test]
+    fn test_should_translate_without_language() {
+        let (mut ctx, _tmpdir) = create_context("");
+        ctx.config.book.language = None;
+        // A PO file alone is not enough, the language must also be set.
+        write_po_file(&ctx, "po/en.po", DANISH_PO);
+        assert!(!should_translate(&ctx));
+    }
+
+    #[test]
+    fn test_should_translate_without_po_file() {
+        let (ctx, _tmpdir) = create_context("[book]\nlanguage = \"da\"");
+        assert!(!should_translate(&ctx));
+    }
+
+    #[test]
+    fn test_should_translate_with_po_file() {
+        let (ctx, _tmpdir) = create_context("[book]\nlanguage = \"da\"");
+        write_po_file(&ctx, "po/da.po", DANISH_PO);
+        assert!(should_translate(&ctx));
+    }
+
+    #[test]
+    fn test_run_translates_book() {
+        let (ctx, _tmpdir) = create_context("[book]\nlanguage = \"da\"");
+        write_po_file(&ctx, "po/da.po", DANISH_PO);
+        let book = Gettext.run(&ctx, create_book("Hello")).unwrap();
+        assert_eq!(chapter_content(&book), "Hej");
+    }
+
+    #[test]
+    fn test_run_with_custom_po_dir() {
+        let (ctx, _tmpdir) = create_context(
+            "[book]\nlanguage = \"da\"\n\n[preprocessor.gettext]\npo-dir = \"translations\"",
+        );
+        write_po_file(&ctx, "translations/da.po", DANISH_PO);
+        let book = Gettext.run(&ctx, create_book("Hello")).unwrap();
+        assert_eq!(chapter_content(&book), "Hej");
+    }
+
+    #[test]
+    fn test_run_without_po_file_leaves_book_unchanged() {
+        let (ctx, _tmpdir) = create_context("[book]\nlanguage = \"da\"");
+        let book = Gettext.run(&ctx, create_book("Hello")).unwrap();
+        assert_eq!(chapter_content(&book), "Hello");
+    }
+
+    #[test]
+    fn test_run_with_invalid_po_file() {
+        let (ctx, _tmpdir) = create_context("[book]\nlanguage = \"da\"");
+        write_po_file(&ctx, "po/da.po", "msgid \"Hello\"\nmsgstr \"unterminated");
+        assert!(Gettext.run(&ctx, create_book("Hello")).is_err());
+    }
+}
