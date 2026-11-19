@@ -45,15 +45,33 @@ fn strip_link(text: &str) -> String {
     without_link
 }
 
+/// Merge the comment for a new occurrence of a message into the
+/// comments already collected for it.
+///
+/// Comments from different occurrences are kept on separate lines and
+/// a comment that is already present is not repeated.
+fn merge_comments(existing: &str, new: &str) -> String {
+    if new.is_empty() || existing.lines().any(|line| line == new) {
+        String::from(existing)
+    } else if existing.is_empty() {
+        String::from(new)
+    } else {
+        format!("{existing}\n{new}")
+    }
+}
+
 fn add_message(catalog: &mut Catalog, msgid: &str, source: &str, comment: &str) {
-    let sources = match catalog.find_message(None, msgid, None) {
-        Some(msg) => format!("{}\n{}", msg.source(), source),
-        None => String::from(source),
+    let (sources, comments) = match catalog.find_message(None, msgid, None) {
+        Some(msg) => (
+            format!("{}\n{}", msg.source(), source),
+            merge_comments(msg.extracted_comments(), comment),
+        ),
+        None => (String::from(source), String::from(comment)),
     };
     let message = Message::build_singular()
         .with_source(sources)
         .with_msgid(String::from(msgid))
-        .with_extracted_comments(String::from(comment))
+        .with_extracted_comments(comments)
         .done();
     catalog.append_or_update(message);
 }
@@ -489,6 +507,52 @@ mod tests {
                 .map(|msg| (msg.source(), msg.msgid()))
                 .collect::<Vec<_>>(),
             &[("src/SUMMARY.md:1 src/foo.md:1 src/foo.md:3", "Foo"),]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_duplicates_keep_comments() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            ("book.toml", "[book]"),
+            ("src/SUMMARY.md", "- [Foo](foo.md)"),
+            (
+                "src/foo.md",
+                "# Foo\n\
+                 \n\
+                 <!-- i18n:comment: A verb, as in saving a file. -->\n\
+                 Save\n\
+                 \n\
+                 Save\n\
+                 \n\
+                 <!-- i18n:comment: The adjective. -->\n\
+                 Open\n\
+                 \n\
+                 <!-- i18n:comment: The verb. -->\n\
+                 Open\n\
+                 \n\
+                 <!-- i18n:comment: Same note. -->\n\
+                 Close\n\
+                 \n\
+                 <!-- i18n:comment: Same note. -->\n\
+                 Close\n",
+            ),
+        ])?;
+
+        let catalogs = create_catalogs(&ctx, std::fs::read_to_string)?;
+        let catalog = &catalogs[&default_template_file()];
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.msgid(), msg.extracted_comments()))
+                .collect::<Vec<_>>(),
+            &[
+                ("Foo", ""),
+                ("Save", "A verb, as in saving a file."),
+                ("Open", "The adjective.\nThe verb."),
+                ("Close", "Same note."),
+            ]
         );
 
         Ok(())
