@@ -31,6 +31,23 @@ Please add your project below if it uses
 - [The Cairo Programming Language](https://book.cairo-lang.org/)
 - [The Veryl Hardware Description Language](https://doc.veryl-lang.org/book/)
 - [Rust By Example](https://github.com/rust-lang/rust-by-example)
+- [Localization of Comprehensive Rust](https://github.com/localizethedocs/comprehensive-rust-l10n)
+- [Localization of The Asterinas Book](https://github.com/localizethedocs/asterinas-book-l10n)
+- [Localization of The Cargo Book](https://github.com/localizethedocs/cargo-book-l10n)
+- [Localization of The Helix Documentation](https://github.com/localizethedocs/helix-docs-l10n)
+- [Localization of The Leptos Book](https://github.com/localizethedocs/leptos-book-l10n)
+- [Localization of The Maturin User Guide](https://github.com/localizethedocs/maturin-guide-l10n)
+- [Localization of The mdBook Documentation](https://github.com/localizethedocs/mdbook-docs-l10n)
+- [Localization of The PRQL Language Book](https://github.com/localizethedocs/prql-book-l10n)
+- [Localization of The PyO3 User Guide](https://github.com/localizethedocs/pyo3-guide-l10n)
+- [Localization of The Redox OS Book](https://github.com/localizethedocs/redoxos-book-l10n)
+- [Localization of The Rust Book](https://github.com/localizethedocs/rust-book-l10n)
+- [Localization of The Rust Edition Guide](https://github.com/localizethedocs/rust-edition-guide-l10n)
+- [Localization of The Rust Embedded Book](https://github.com/localizethedocs/rust-embedded-book-l10n)
+- [Localization of The Rust Design Patterns](https://github.com/localizethedocs/rust-patterns-l10n)
+- [Localization of The Rust RFCs Book](https://github.com/localizethedocs/rust-rfcs-l10n)
+- [Localization of The Rustdoc Book](https://github.com/localizethedocs/rustdoc-book-l10n)
+- [Localization of The Zed Documentation](https://github.com/localizethedocs/zed-docs-l10n)
 
 ### i18n-report
 
