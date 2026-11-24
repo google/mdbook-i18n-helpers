@@ -24,8 +24,8 @@ fn main() -> anyhow::Result<()> {
         [] => unreachable!(),
     };
 
-    let catalog = po_file::parse(Path::new(input))
-        .with_context(|| format!("Could not parse {:?}", output))?;
+    let catalog =
+        po_file::parse(Path::new(input)).with_context(|| format!("Could not parse {:?}", input))?;
     let normalized = normalize(catalog)?;
     po_file::write_to_file(&normalized, Path::new(output))
         .with_context(|| format!("Could not write catalog to {}", output))?;
