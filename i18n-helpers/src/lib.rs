@@ -714,6 +714,59 @@ fn extract_trailing_whitespaces<'a>(buf: &mut Vec<(usize, Event<'a>)>) -> Vec<(u
     ret
 }
 
+/// Returns true if the code block is written in one of `languages`.
+///
+/// The language is the first word of the info string: it is `rust`
+/// for both `rust,editable` and `rust editable`. The comparison
+/// ignores ASCII case. A code block without a language never matches.
+fn is_codeblock_in_languages(kind: &CodeBlockKind<'_>, languages: &[String]) -> bool {
+    let CodeBlockKind::Fenced(info_string) = kind else {
+        return false;
+    };
+    let language = info_string
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .next()
+        .unwrap_or_default();
+    !language.is_empty()
+        && languages
+            .iter()
+            .any(|skipped| skipped.eq_ignore_ascii_case(language))
+}
+
+/// Skip the code blocks written in one of `languages`.
+///
+/// The translatable groups of these code blocks are turned into
+/// skipped groups. All other groups are returned unchanged.
+fn skip_codeblocks<'a>(groups: Vec<Group<'a>>, languages: &[String]) -> Vec<Group<'a>> {
+    let mut in_skipped_codeblock = false;
+    groups
+        .into_iter()
+        .map(|group| {
+            let events = match &group {
+                Group::Translate { events, .. } | Group::Skip(events) => events,
+            };
+            // `group_events` begins a new group when a code block
+            // starts and ends the group when the code block ends. The
+            // code block is then either a single group or it is split
+            // into several groups by `parse_codeblock`.
+            if let Some((_, Event::Start(Tag::CodeBlock(kind)))) = events.first() {
+                in_skipped_codeblock = is_codeblock_in_languages(kind, languages);
+            }
+            let is_codeblock_end =
+                matches!(events.last(), Some((_, Event::End(TagEnd::CodeBlock))));
+
+            let group = match group {
+                Group::Translate { events, .. } if in_skipped_codeblock => Group::Skip(events),
+                group => group,
+            };
+            if is_codeblock_end {
+                in_skipped_codeblock = false;
+            }
+            group
+        })
+        .collect()
+}
+
 /// Render a slice of Markdown events back to Markdown.
 ///
 /// # Examples
@@ -834,11 +887,42 @@ impl From<&str> for ExtractedMessage {
 /// );
 /// ```
 pub fn extract_messages(document: &str) -> Result<Vec<(usize, ExtractedMessage)>, CmarkError> {
+    extract_messages_skipping_codeblocks(document, &[])
+}
+
+/// Extract translatable strings from `document`, leaving out the code
+/// blocks written in one of `skip_languages`.
+///
+/// This works like [`extract_messages`], except that nothing is
+/// extracted from a fenced code block if its language is found in
+/// `skip_languages`. The language is the first word of the info
+/// string, so `rust` is the language of a code block which starts
+/// with `` ```rust,editable ``. The comparison ignores ASCII case.
+///
+/// # Examples
+///
+/// ```
+/// use mdbook_i18n_helpers::extract_messages_skipping_codeblocks;
+///
+/// let document = "Some text.\n\
+///                 \n\
+///                 ```toml\n\
+///                 name = \"hello\"\n\
+///                 ```\n";
+/// assert_eq!(
+///     extract_messages_skipping_codeblocks(document, &[String::from("toml")]).unwrap(),
+///     vec![(1, "Some text.".into())],
+/// );
+/// ```
+pub fn extract_messages_skipping_codeblocks(
+    document: &str,
+    skip_languages: &[String],
+) -> Result<Vec<(usize, ExtractedMessage)>, CmarkError> {
     let events = extract_events(document, None);
     let mut messages = Vec::new();
     let mut state = None;
 
-    for group in group_events(&events)? {
+    for group in skip_codeblocks(group_events(&events)?, skip_languages) {
         match group {
             Group::Translate { events, comment } => {
                 if let Some((lineno, _)) = events.first() {
@@ -969,6 +1053,28 @@ mod tests {
     fn assert_extract_messages(document: &str, expected: &[(usize, &str)]) {
         assert_eq!(
             extract_messages(document)
+                .unwrap()
+                .iter()
+                .map(|(lineno, msg)| (*lineno, &msg.message[..]))
+                .collect::<Vec<_>>(),
+            expected,
+        );
+    }
+
+    /// Extract messages in `document` while skipping the code blocks in
+    /// `skip_languages`, assert they match `expected`.
+    #[track_caller]
+    fn assert_extract_messages_skipping_codeblocks(
+        document: &str,
+        skip_languages: &[&str],
+        expected: &[(usize, &str)],
+    ) {
+        let skip_languages = skip_languages
+            .iter()
+            .map(|language| String::from(*language))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            extract_messages_skipping_codeblocks(document, &skip_languages)
                 .unwrap()
                 .iter()
                 .map(|(lineno, msg)| (*lineno, &msg.message[..]))
@@ -1889,6 +1995,140 @@ This should be translated.
     }
 
     #[test]
+    fn extract_messages_skip_codeblock_languages() {
+        let document = r#"Some text.
+
+```toml
+# A TOML comment
+name = "TOML string"
+```
+
+```rust
+// A Rust comment
+```
+
+```shell
+echo "Shell string"
+```
+
+More text.
+"#;
+        // Nothing is skipped by default.
+        assert_extract_messages_skipping_codeblocks(
+            document,
+            &[],
+            &[
+                (1, "Some text."),
+                (3, "```toml\n# A TOML comment\nname = \"TOML string\"\n```"),
+                (9, "// A Rust comment\n"),
+                (12, "```shell\necho \"Shell string\"\n```"),
+                (16, "More text."),
+            ],
+        );
+        assert_extract_messages_skipping_codeblocks(
+            document,
+            &["toml", "shell"],
+            &[
+                (1, "Some text."),
+                (9, "// A Rust comment\n"),
+                (16, "More text."),
+            ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_codeblock_languages_with_attributes() {
+        // The language is the first word of the info string.
+        assert_extract_messages_skipping_codeblocks(
+            r#"```rust,editable
+// Comma
+```
+
+```rust editable
+// Space
+```
+
+```rust
+// Alone
+```
+"#,
+            &["rust"],
+            &[],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_codeblock_languages_ignores_case() {
+        assert_extract_messages_skipping_codeblocks(
+            r#"```TOML
+name = "Upper"
+```
+
+```toml
+name = "Lower"
+```
+"#,
+            &["Toml"],
+            &[],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_codeblock_languages_needs_exact_name() {
+        // Only the listed name is skipped, not other names for the same
+        // language or names which merely start the same way.
+        assert_extract_messages_skipping_codeblocks(
+            r#"```sh
+# sh
+```
+
+```bash
+# bash
+```
+
+```shell-session
+$ echo "shell-session"
+```
+"#,
+            &["sh", "shell"],
+            &[
+                (6, "# bash\n"),
+                (9, "```shell-session\n$ echo \"shell-session\"\n```"),
+            ],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_codeblock_languages_without_language() {
+        // Code blocks without a language cannot be skipped this way,
+        // not even with an empty name.
+        assert_extract_messages_skipping_codeblocks(
+            r#"```
+print("No language")
+```
+"#,
+            &["", "toml"],
+            &[(1, "```\nprint(\"No language\")\n```")],
+        );
+    }
+
+    #[test]
+    fn extract_messages_skip_codeblock_languages_in_list() {
+        assert_extract_messages_skipping_codeblocks(
+            r#"- First item:
+
+  ```toml
+  name = "TOML string"
+  ```
+
+- Second item.
+"#,
+            &["toml"],
+            &[(1, "First item:"), (7, "Second item.")],
+        );
+    }
+
+    #[test]
     fn extract_messages_automatic_skipping_nontranslatable_codeblocks_simple() {
         assert_extract_messages(
             r"
@@ -2250,6 +2490,54 @@ some_syntax = do_something();
         assert!(reconstructed.contains("TRANSLATED"));
         assert!(reconstructed.contains("Skipped"));
         assert!(!reconstructed.contains("SHOULD_NOT_APPEAR"));
+    }
+
+    #[test]
+    fn translate_events_skipped_codeblock_language() {
+        use polib::catalog::Catalog;
+        use polib::message::Message;
+        use polib::metadata::CatalogMetadata;
+
+        let document = "Some text.\n\
+                        \n\
+                        ```toml\n\
+                        name = \"TOML string\"\n\
+                        ```\n\
+                        \n\
+                        ```rust\n\
+                        // A Rust comment\n\
+                        ```\n";
+
+        // Translate every message extracted from the document. The
+        // TOML code block is skipped, so the catalog has no message
+        // for it.
+        let mut catalog = Catalog::new(CatalogMetadata::new());
+        for (_, extracted) in
+            extract_messages_skipping_codeblocks(document, &[String::from("toml")]).unwrap()
+        {
+            let msg = Message::build_singular()
+                .with_msgstr(extracted.message.to_uppercase())
+                .with_msgid(extracted.message)
+                .done();
+            catalog.append_or_update(msg);
+        }
+
+        let events = extract_events(document, None);
+        let translated = translate_events(&events, &catalog).unwrap();
+        let (reconstructed, _) = reconstruct_markdown(&translated, None).unwrap();
+
+        assert_eq!(
+            reconstructed,
+            "SOME TEXT.\n\
+             \n\
+             ```toml\n\
+             name = \"TOML string\"\n\
+             ```\n\
+             \n\
+             ```rust\n\
+             // A RUST COMMENT\n\
+             ```",
+        );
     }
 
     #[test]
