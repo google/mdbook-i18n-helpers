@@ -20,7 +20,10 @@ use std::collections::HashMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use super::{extract_events, extract_messages, reconstruct_markdown, wrap_sources};
+use super::{
+    extract_events, extract_messages, extract_messages_skipping_codeblocks, reconstruct_markdown,
+    wrap_sources,
+};
 use anyhow::{anyhow, Context};
 use mdbook_renderer::RenderContext;
 use mdbook_renderer::{book, book::BookItem};
@@ -191,6 +194,13 @@ where
     catalogs.insert(unique_path_builder.get(), catalog);
     unique_path_builder.pop();
 
+    // The languages of the code blocks to leave out. The default is
+    // to extract messages from all code blocks.
+    let skip_codeblock_languages = ctx
+        .config
+        .get::<Vec<String>>("output.xgettext.skip-codeblock-languages")?
+        .unwrap_or_default();
+
     // Next, we add the part-title and chapter contents.
     for item in &ctx.book.items {
         if let BookItem::PartTitle(title) = item {
@@ -214,10 +224,13 @@ where
                     .entry(destination)
                     .or_insert(Catalog::new(generate_catalog_metadata(ctx)));
                 let path = ctx.config.book.src.join(&source);
-                for (lineno, extracted) in extract_messages(&content).context(anyhow!(
-                    "Failed to extract messages in chapter {}",
-                    chapter.name
-                ))? {
+                for (lineno, extracted) in
+                    extract_messages_skipping_codeblocks(&content, &skip_codeblock_languages)
+                        .context(anyhow!(
+                            "Failed to extract messages in chapter {}",
+                            chapter.name
+                        ))?
+                {
                     let msgid = extracted.message;
                     let source = build_source(&path, lineno, granularity);
                     add_message(catalog, &msgid, &source, &extracted.comment);
@@ -632,6 +645,65 @@ mod tests {
                 ("src/foo.md:1 src/foo.md:3", "Bar"),
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_skip_codeblock_languages() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 skip-codeblock-languages = [\"toml\"]",
+            ),
+            ("src/SUMMARY.md", "- [Foo](foo.md)"),
+            (
+                "src/foo.md",
+                "Some text.\n\
+                 \n\
+                 ```toml\n\
+                 name = \"TOML string\"\n\
+                 ```\n\
+                 \n\
+                 ```rust\n\
+                 // A Rust comment\n\
+                 ```\n\
+                 ",
+            ),
+        ])?;
+
+        let catalogs = create_catalogs(&ctx, std::fs::read_to_string)?;
+        let catalog = &catalogs[&default_template_file()];
+        assert_eq!(
+            catalog
+                .messages()
+                .map(|msg| (msg.source(), msg.msgid()))
+                .collect::<Vec<_>>(),
+            &[
+                ("src/SUMMARY.md:1", "Foo"),
+                ("src/foo.md:1", "Some text."),
+                ("src/foo.md:8", "// A Rust comment\n"),
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_create_catalog_skip_codeblock_languages_not_a_list() -> anyhow::Result<()> {
+        let (ctx, _tmp) = create_render_context(&[
+            (
+                "book.toml",
+                "[book]\n\
+                 [output.xgettext]\n\
+                 skip-codeblock-languages = \"toml\"",
+            ),
+            ("src/SUMMARY.md", ""),
+        ])?;
+
+        assert!(create_catalogs(&ctx, std::fs::read_to_string).is_err());
 
         Ok(())
     }

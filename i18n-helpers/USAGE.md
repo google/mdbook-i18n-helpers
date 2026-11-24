@@ -281,6 +281,27 @@ Everything between `skip-start` and `skip-end` is skipped. If `skip-end` is
 omitted, all remaining content in the document is skipped. Nesting is not
 supported.
 
+### Skipping Code Blocks by Language
+
+To skip all code blocks written in certain languages, list the languages in the
+`skip-codeblock-languages` parameter when you run `mdbook-xgettext`. This will
+skip all TOML and shell code blocks:
+
+```shell
+MDBOOK_OUTPUT='{"xgettext": {"skip-codeblock-languages": ["toml", "shell"]}}' \
+  mdbook build -d po
+```
+
+A language is compared with the first word after the opening code fence and the
+case is ignored. The example above will thus also skip a code block which starts
+with `` ```toml,editable ``. Other names for the same language are not skipped:
+if your book uses both `sh` and `shell`, then you must list both. Code blocks
+without a language are not affected.
+
+The skipped code blocks are left out of the `messages.pot` file. Their messages
+will be marked as old in your `xx.po` files the next time you update them with
+`msgmerge`, and `mdbook-gettext` will then show the code blocks untranslated.
+
 ## Normalizing Existing PO Files
 
 When mdbook-i18n-helpers change, the generated PO files change as well. This can
