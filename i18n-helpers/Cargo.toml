@@ -20,7 +20,7 @@ mdbook-preprocessor.workspace = true
 mdbook-renderer.workspace = true
 polib.workspace = true
 pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
-pulldown-cmark-to-cmark = "22.0.0"
+pulldown-cmark-to-cmark = "23.0.0"
 regex = "1.12"
 semver = "1.0.28"
 serde_json.workspace = true
